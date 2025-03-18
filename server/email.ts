@@ -1,4 +1,4 @@
-import * as SibApiV3Sdk from '@sendinblue/client';
+import SibApiV3Sdk from '@sendinblue/client';
 import type { Question } from "@shared/schema";
 import { log } from "./vite";
 
@@ -10,10 +10,19 @@ let apiInstance: SibApiV3Sdk.TransactionalEmailsApi | null = null;
 
 try {
   log("Initializing Brevo API client...");
-  const apiKey = process.env.BREVO_API_KEY;
-  const defaultClient = SibApiV3Sdk.ApiClient.instance;
-  defaultClient.authentications['api-key'].apiKey = apiKey;
-  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+  // Create API instance first
+  const defaultClient = new SibApiV3Sdk.ApiClient();
+
+  // Configure API key authorization
+  const apiKey = defaultClient.authentications['api-key'];
+  if (apiKey) {
+    apiKey.apiKey = process.env.BREVO_API_KEY;
+    log(`API Key configured successfully (length: ${process.env.BREVO_API_KEY.length})`);
+  } else {
+    throw new Error('API key authentication not properly configured');
+  }
+
+  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi(defaultClient);
   log("Brevo API client initialized successfully");
 } catch (error) {
   log(`Error initializing Brevo API client: ${error}`);
@@ -64,22 +73,24 @@ export async function sendDailyQuestions(
   try {
     log("Creating email payload...");
 
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail(); 
     sendSmtpEmail.to = [{ email: email, name: firstName }];
     sendSmtpEmail.sender = { 
-      email: "noreply@eduquest.com",
+      email: "edu@eduquest.com",
       name: "EduQuest Learning"
     };
     sendSmtpEmail.subject = "Your Daily Learning Questions";
     sendSmtpEmail.htmlContent = emailHtml;
 
-    log(`Email configuration prepared for ${email}`);
-    log(`Subject: ${sendSmtpEmail.subject}`);
+    // Log email configuration (without sensitive data)
+    log(`Email configuration prepared:`);
+    log(`To: ${email}`);
+    log(`From: ${sendSmtpEmail.sender.name} <${sendSmtpEmail.sender.email}>`);
     log(`Content Length: ${emailHtml.length} bytes`);
 
     log("Sending email via Brevo API...");
     const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    log(`Email sent successfully! Response data: ${JSON.stringify(data)}`);
+    log(`Email sent successfully! Response: ${JSON.stringify(data)}`);
 
   } catch (error: any) {
     log(`Failed to send email to ${email}`);

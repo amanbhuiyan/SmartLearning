@@ -89,6 +89,30 @@ function startPeriodicQuestions(userId: number) {
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
+  // Add test endpoint without authentication for initial testing
+  app.post('/api/test-email-no-auth', async (req, res) => {
+    try {
+      log("Testing email functionality without auth...");
+      const testQuestions = getDailyQuestions("math", 5, 2);
+      const questionsBySubject = { math: testQuestions };
+
+      // Attempt to send email
+      await sendDailyQuestions(
+        "test@example.com",
+        "Test User",
+        questionsBySubject
+      );
+
+      res.json({ message: "Test email sent successfully" });
+    } catch (error: any) {
+      log(`Test email failed: ${error.message}`);
+      res.status(500).json({ 
+        error: "Failed to send test email",
+        details: error.message 
+      });
+    }
+  });
+
   // Add test endpoint for email functionality
   app.post('/api/test-email', async (req, res) => {
     if (!req.isAuthenticated()) {
