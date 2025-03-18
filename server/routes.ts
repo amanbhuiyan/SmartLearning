@@ -8,93 +8,104 @@ import { sendDailyQuestions } from "./email";
 import { log } from "./vite";
 import Stripe from 'stripe';
 
-let stripe: Stripe | undefined;
-try {
-  if (process.env.STRIPE_SECRET_KEY) {
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2023-10-16",
-    });
-  }
-} catch (error) {
-  console.warn("Stripe integration disabled - missing configuration");
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2023-10-16" as const,
+});
 
 // Store active intervals by user ID
 const activeIntervals = new Map<number, NodeJS.Timeout>();
 
-// Function to send questions to a specific user
-async function sendQuestionsToUser(userId: number) {
-  try {
-    log(`Starting periodic questions task for user ${userId}`);
-    const user = await storage.getUser(userId);
-    const profile = await storage.getStudentProfile(userId);
-
-    if (!user || !profile) {
-      log(`Cannot send questions: User ${userId} or profile not found`);
-      return;
-    }
-
-    log(`Generating questions for user ${userId} (${user.email})`);
-
-    // Generate new questions for each subject
-    const questionsBySubject: Record<string, any> = {};
-    for (const subject of profile.subjects) {
-      const questions = getDailyQuestions(subject, profile.grade, 20);
-      questionsBySubject[subject] = questions;
-      log(`Generated ${questions.length} questions for ${subject}`);
-    }
-
-    // Send email with questions
-    try {
-      log(`Attempting to send email to ${user.email}`);
-      await new Promise(resolve => setTimeout(resolve, 5000)); // 5-second delay
-      await sendDailyQuestions(
-        user.email,
-        user.firstName,
-        questionsBySubject
-      );
-      log(`Successfully sent periodic questions email to ${user.email}`);
-    } catch (error) {
-      log(`Failed to send periodic questions email to ${user.email}: ${error}`);
-    }
-  } catch (error) {
-    log(`Error in periodic questions task for user ${userId}: ${error}`);
-  }
-}
-
-// Function to start periodic questions for a user
-function startPeriodicQuestions(userId: number) {
-  // Clear any existing interval
-  if (activeIntervals.has(userId)) {
-    clearInterval(activeIntervals.get(userId));
-    activeIntervals.delete(userId);
-    log(`Cleared existing periodic questions for user ${userId}`);
-  }
-
-  // Create new interval - send every 1 minute
-  log(`Starting new periodic questions interval for user ${userId}`);
-  const interval = setInterval(() => {
-    log(`Triggering periodic questions for user ${userId}`);
-    sendQuestionsToUser(userId);
-  }, 60000); // Every minute
-
-  activeIntervals.set(userId, interval);
-
-  // Send the first batch immediately
-  log(`Sending initial questions for user ${userId}`);
-  sendQuestionsToUser(userId);
-
-  log(`Started periodic questions for user ${userId}`);
-}
-
 // Add type safety for subscription response
 interface StripeSubscriptionResponse {
   subscriptionId: string;
-  clientSecret: string | undefined;
+  clientSecret: string;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+
+  app.post('/api/get-or-create-subscription', async (req, res) => {
+    if (!stripe) {
+      return res.status(503).json({ message: "Subscription service temporarily unavailable" });
+    }
+
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = req.user;
+
+    try {
+      // Check existing subscription
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        const paymentIntent = await stripe.paymentIntents.retrieve(
+          (subscription.latest_invoice as Stripe.Invoice).payment_intent as string
+        );
+
+        const response: StripeSubscriptionResponse = {
+          subscriptionId: subscription.id,
+          clientSecret: paymentIntent.client_secret as string,
+        };
+        res.json(response);
+        return;
+      }
+
+      // Create new customer and subscription
+      const customer = await stripe.customers.create({
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+      });
+
+      if (!process.env.STRIPE_PRICE_ID) {
+        throw new Error('STRIPE_PRICE_ID is not configured');
+      }
+
+      const subscription = await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{
+          price: process.env.STRIPE_PRICE_ID,
+        }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: {
+          payment_method_types: ['card'],
+          save_default_payment_method: 'on_subscription',
+        },
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      // Update user with Stripe info
+      await storage.updateUserStripeInfo(user.id, {
+        customerId: customer.id,
+        subscriptionId: subscription.id
+      });
+
+      const invoice = subscription.latest_invoice as Stripe.Invoice;
+      const paymentIntent = invoice.payment_intent as Stripe.PaymentIntent;
+
+      if (!paymentIntent?.client_secret) {
+        throw new Error('Failed to create payment intent');
+      }
+
+      const response: StripeSubscriptionResponse = {
+        subscriptionId: subscription.id,
+        clientSecret: paymentIntent.client_secret,
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      log(`Subscription error: ${error.message}`);
+      res.status(400).json({ 
+        error: { 
+          message: error.message || 'Failed to create subscription'
+        } 
+      });
+    }
+  });
 
   // Add test endpoint without authentication for initial testing
   app.post('/api/test-email-no-auth', async (req, res) => {
@@ -230,79 +241,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(questionsBySubject);
   });
 
-  app.post('/api/get-or-create-subscription', async (req, res) => {
-    if (!stripe) {
-      return res.status(503).json({ 
-        message: "Subscription service temporarily unavailable" 
-      });
-    }
-
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    const user = req.user;
-
-    try {
-      // Check existing subscription
-      if (user.stripeSubscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-        const response: StripeSubscriptionResponse = {
-          subscriptionId: subscription.id,
-          clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
-        };
-        res.json(response);
-        return;
-      }
-
-      // Create new customer and subscription
-      const customer = await stripe.customers.create({
-        name: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-      });
-
-      if (!process.env.STRIPE_PRICE_ID) {
-        throw new Error('STRIPE_PRICE_ID is not configured');
-      }
-
-      const subscription = await stripe.subscriptions.create({
-        customer: customer.id,
-        items: [{
-          price: process.env.STRIPE_PRICE_ID,
-        }],
-        payment_behavior: 'default_incomplete',
-        payment_settings: {
-          payment_method_types: ['card'],
-          save_default_payment_method: 'on_subscription',
-        },
-        expand: ['latest_invoice.payment_intent'],
-      });
-
-      // Update user with Stripe info
-      await storage.updateUserStripeInfo(user.id, {
-        customerId: customer.id,
-        subscriptionId: subscription.id
-      });
-
-      // Type assertion to ensure proper structure
-      const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
-      const paymentIntent = latestInvoice.payment_intent as Stripe.PaymentIntent;
-
-      const response: StripeSubscriptionResponse = {
-        subscriptionId: subscription.id,
-        clientSecret: paymentIntent.client_secret,
-      };
-
-      res.json(response);
-    } catch (error: any) {
-      log(`Subscription error: ${error.message}`);
-      res.status(400).json({ 
-        error: { 
-          message: error.message || 'Failed to create subscription'
-        } 
-      });
-    }
-  });
 
   // Cleanup intervals on logout
   app.post("/api/logout", (req, res, next) => {

@@ -15,12 +15,16 @@ import {
 } from '@stripe/react-stripe-js';
 import { useToast } from "@/hooks/use-toast";
 
+if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
+  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
+}
+
 // Initialize Stripe with the public key
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 interface StripeResponse {
-  clientSecret: string;
   subscriptionId: string;
+  clientSecret: string;
 }
 
 interface SubscribeFormProps {
@@ -108,6 +112,18 @@ export default function Subscribe() {
   const { toast } = useToast();
 
   useEffect(() => {
+    // If user is not authenticated, redirect to auth page
+    if (!user) {
+      setLocation("/auth");
+      return;
+    }
+
+    // Already subscribed users should be redirected to dashboard
+    if (user.isSubscribed) {
+      setLocation("/");
+      return;
+    }
+
     const initializePayment = async () => {
       try {
         const response = await apiRequest<StripeResponse>('/api/get-or-create-subscription', {
@@ -133,47 +149,13 @@ export default function Subscribe() {
       }
     };
 
-    // If user is not authenticated, redirect to auth page
-    if (!user) {
-      setLocation("/auth");
-      return;
-    }
-
-    // Already subscribed users should be redirected to dashboard
-    if (user.isSubscribed) {
-      setLocation("/");
-      return;
-    }
-
     initializePayment();
   }, [user, setLocation, toast]);
 
-  // Show loading state
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
-        <div className="max-w-2xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle>Something went wrong</CardTitle>
-              <CardDescription>{error}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex justify-center">
-              <Button onClick={() => setLocation("/")}>
-                Return to Dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     );
   }
@@ -189,7 +171,14 @@ export default function Subscribe() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {clientSecret && stripePromise && (
+            {error ? (
+              <div className="text-center space-y-4">
+                <p className="text-destructive">{error}</p>
+                <Button onClick={() => setLocation("/")}>
+                  Return to Dashboard
+                </Button>
+              </div>
+            ) : clientSecret && stripePromise ? (
               <Elements 
                 stripe={stripePromise} 
                 options={{
@@ -199,7 +188,7 @@ export default function Subscribe() {
               >
                 <SubscribeForm clientSecret={clientSecret} />
               </Elements>
-            )}
+            ) : null}
           </CardContent>
         </Card>
       </div>
