@@ -7,6 +7,8 @@ import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
 import { log } from "./vite";
 import Stripe from 'stripe';
+import type { Question } from "./types"; // Assuming a type definition for Question exists
+
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -23,6 +25,70 @@ const activeIntervals = new Map<number, NodeJS.Timeout>();
 interface StripeSubscriptionResponse {
   subscriptionId: string;
   clientSecret: string;
+}
+
+// Function to send questions to a specific user
+async function sendQuestionsToUser(userId: number) {
+  try {
+    log(`Starting periodic questions task for user ${userId}`);
+    const user = await storage.getUser(userId);
+    const profile = await storage.getStudentProfile(userId);
+
+    if (!user || !profile) {
+      log(`Cannot send questions: User ${userId} or profile not found`);
+      return;
+    }
+
+    log(`Generating questions for user ${userId} (${user.email})`);
+
+    // Generate new questions for each subject
+    const questionsBySubject: Record<string, Question[]> = {};
+    for (const subject of profile.subjects) {
+      const questions = getDailyQuestions(subject, profile.grade, 20);
+      questionsBySubject[subject] = questions;
+      log(`Generated ${questions.length} questions for ${subject}`);
+    }
+
+    // Send email with questions
+    try {
+      log(`Attempting to send email to ${user.email}`);
+      await sendDailyQuestions(
+        user.email,
+        user.firstName,
+        questionsBySubject
+      );
+      log(`Successfully sent periodic questions email to ${user.email}`);
+    } catch (error) {
+      log(`Failed to send periodic questions email to ${user.email}: ${error}`);
+    }
+  } catch (error) {
+    log(`Error in periodic questions task for user ${userId}: ${error}`);
+  }
+}
+
+// Function to start periodic questions for a user
+function startPeriodicQuestions(userId: number) {
+  // Clear any existing interval
+  if (activeIntervals.has(userId)) {
+    clearInterval(activeIntervals.get(userId));
+    activeIntervals.delete(userId);
+    log(`Cleared existing periodic questions for user ${userId}`);
+  }
+
+  // Create new interval - send questions daily
+  log(`Starting new periodic questions interval for user ${userId}`);
+  const interval = setInterval(() => {
+    log(`Triggering periodic questions for user ${userId}`);
+    sendQuestionsToUser(userId);
+  }, 24 * 60 * 60 * 1000); // Every 24 hours
+
+  activeIntervals.set(userId, interval);
+
+  // Send the first batch immediately
+  log(`Sending initial questions for user ${userId}`);
+  sendQuestionsToUser(userId);
+
+  log(`Started periodic questions for user ${userId}`);
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -99,10 +165,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(response);
     } catch (error: any) {
       log(`Subscription error: ${error.message}`);
-      res.status(400).json({ 
-        error: { 
+      res.status(400).json({
+        error: {
           message: error.message || 'Failed to create subscription'
-        } 
+        }
       });
     }
   });
@@ -121,16 +187,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         questionsBySubject
       );
 
-      res.json({ 
+      res.json({
         message: "Test email sent successfully",
         sentTo: "aub204@yahoo.com",
         emailType: "Daily Learning Questions"
       });
     } catch (error: any) {
       log(`Test email failed: ${error.message}`);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to send test email",
-        details: error.message 
+        details: error.message
       });
     }
   });
@@ -162,9 +228,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Test email sent successfully" });
     } catch (error: any) {
       log(`Test email failed: ${error.message}`);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to send test email",
-        details: error.message 
+        details: error.message
       });
     }
   });
