@@ -31,7 +31,7 @@ export default function Dashboard() {
     },
   });
 
-  const { data: questions, isLoading: isLoadingQuestions } = useQuery<Question[]>({
+  const { data: questionsBySubject, isLoading: isLoadingQuestions } = useQuery<Record<string, Question[]>>({
     queryKey: ["/api/questions"],
     onError: (error: Error) => {
       toast({
@@ -55,7 +55,7 @@ export default function Dashboard() {
     );
   }
 
-  if (!profile || !questions) {
+  if (!profile || !questionsBySubject) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
         <div className="max-w-4xl mx-auto">
@@ -111,39 +111,46 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{subjectsDisplay} - Year {profile.grade}</CardTitle>
+            <CardTitle>Year {profile.grade} - Daily Questions</CardTitle>
             <CardDescription>
-              Today's learning questions. Click on each question to see the answer and explanation.
+              Today's learning questions for {subjectsDisplay}. Click on each question to see the answer and explanation.
               These questions have also been sent to your email address.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Accordion type="single" collapsible className="space-y-4">
-              {questions.map((question, index) => (
-                <AccordionItem key={question.id} value={`question-${index}`}>
-                  <AccordionTrigger className="text-left">
-                    <span className="font-medium">
-                      Question {index + 1}: {question.question}
-                    </span>
-                  </AccordionTrigger>
-                  <AccordionContent className="space-y-2">
-                    <div>
-                      <strong className="text-primary">Answer:</strong>
-                      <p className="mt-1">{question.answer}</p>
-                    </div>
-                    {question.explanation && (
-                      <>
-                        <Separator className="my-2" />
+            {Object.entries(questionsBySubject).map(([subject, questions]) => (
+              <div key={subject} className="mb-8 last:mb-0">
+                <h2 className="text-xl font-semibold mb-4 text-primary">
+                  {subject.charAt(0).toUpperCase() + subject.slice(1)}
+                </h2>
+                <Accordion type="single" collapsible className="space-y-4">
+                  {questions.map((question, index) => (
+                    <AccordionItem key={question.id} value={`${subject}-question-${index}`}>
+                      <AccordionTrigger className="text-left">
+                        <span className="font-medium">
+                          Question {index + 1}: {question.question}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-2">
                         <div>
-                          <strong className="text-primary">Explanation:</strong>
-                          <p className="mt-1">{question.explanation}</p>
+                          <strong className="text-primary">Answer:</strong>
+                          <p className="mt-1">{question.answer}</p>
                         </div>
-                      </>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+                        {question.explanation && (
+                          <>
+                            <Separator className="my-2" />
+                            <div>
+                              <strong className="text-primary">Explanation:</strong>
+                              <p className="mt-1">{question.explanation}</p>
+                            </div>
+                          </>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>

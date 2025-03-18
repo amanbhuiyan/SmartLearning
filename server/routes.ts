@@ -60,20 +60,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    // Get questions for all selected subjects
-    let allQuestions = [];
+    // Get 20 questions for each selected subject
+    const questionsBySubject = {};
     for (const subject of profile.subjects) {
       const questions = await storage.getDailyQuestions(subject, profile.grade);
-      allQuestions = [...allQuestions, ...questions];
+      questionsBySubject[subject] = questions.slice(0, 20);
     }
 
-    // Limit to 20 questions
-    const limitedQuestions = allQuestions.slice(0, 20);
-
     // TODO: Send email with questions
-    // We'll need to set up an email service (like SendGrid) to implement this
-    // For now, just return the questions
-    res.json(limitedQuestions);
+    // We'll need to set up SendGrid to implement this
+    // For now, just return the questions grouped by subject
+    res.json(questionsBySubject);
   });
 
   // Subscription route - disabled when Stripe is not configured
