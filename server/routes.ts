@@ -2,13 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertProfileSchema } from "@shared/schema";
+import { insertProfileSchema, Question } from "@shared/schema";
 import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
 import { log } from "./vite";
 import Stripe from 'stripe';
-import type { Question } from "./types"; // Assuming a type definition for Question exists
-
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -95,17 +93,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
   app.post('/api/get-or-create-subscription', async (req, res) => {
-    if (!stripe) {
-      return res.status(503).json({ message: "Subscription service temporarily unavailable" });
-    }
-
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    const user = req.user;
-
     try {
+      if (!stripe) {
+        throw new Error("Subscription service temporarily unavailable");
+      }
+
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = req.user;
+
       // Check existing subscription
       if (user.stripeSubscriptionId) {
         const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
@@ -173,7 +171,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add test endpoint without authentication for initial testing
+  // Add existing routes for profiles, questions, etc.
+  app.post('/api/profile', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const data = insertProfileSchema.parse(req.body);
+      const profile = await storage.createStudentProfile({
+        ...data,
+        userId: req.user.id,
+        lastQuestionDate: new Date().toISOString(),
+      });
+
+      startPeriodicQuestions(req.user.id);
+      res.json(profile);
+    } catch (err) {
+      res.status(400).json({ error: "Invalid profile data" });
+    }
+  });
+
+  app.get('/api/profile', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const profile = await storage.getStudentProfile(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    startPeriodicQuestions(req.user.id);
+    res.json(profile);
+  });
+
+  app.get('/api/questions', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const profile = await storage.getStudentProfile(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const questionsBySubject: Record<string, Question[]> = {};
+    for (const subject of profile.subjects) {
+      const questions = getDailyQuestions(subject, profile.grade, 20);
+      questionsBySubject[subject] = questions;
+    }
+
+    try {
+      await sendDailyQuestions(
+        req.user.email,
+        req.user.firstName,
+        questionsBySubject
+      );
+      log(`Questions email sent to ${req.user.email}`);
+    } catch (error) {
+      log(`Failed to send questions email: ${error}`);
+    }
+
+    res.json(questionsBySubject);
+  });
+
+  // Cleanup intervals on logout
+  app.post("/api/logout", (req, res, next) => {
+    if (req.user?.id && activeIntervals.has(req.user.id)) {
+      clearInterval(activeIntervals.get(req.user.id));
+      activeIntervals.delete(req.user.id);
+      log(`Cleared periodic questions for user ${req.user.id}`);
+    }
+    req.logout((err) => {
+      if (err) return next(err);
+      res.sendStatus(200);
+    });
+  });
+
   app.post('/api/test-email-no-auth', async (req, res) => {
     try {
       log("Testing email functionality without auth...");
@@ -200,9 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-
-  // Add test endpoint for email functionality
-  app.post('/api/test-email', async (req, res) => {
+    app.post('/api/test-email', async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
@@ -234,93 +307,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-
-  // Student profile routes
-  app.post('/api/profile', async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const data = insertProfileSchema.parse(req.body);
-      const profile = await storage.createStudentProfile({
-        ...data,
-        userId: req.user.id,
-        lastQuestionDate: new Date().toISOString(),
-      });
-
-      // Start sending periodic questions to this user
-      startPeriodicQuestions(req.user.id);
-
-      res.json(profile);
-    } catch (err) {
-      res.status(400).json({ error: "Invalid profile data" });
-    }
-  });
-
-  app.get('/api/profile', async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    const profile = await storage.getStudentProfile(req.user.id);
-    if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
-    }
-
-    // Start sending periodic questions to this user
-    startPeriodicQuestions(req.user.id);
-
-    res.json(profile);
-  });
-
-  app.get('/api/questions', async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    const profile = await storage.getStudentProfile(req.user.id);
-    if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
-    }
-
-    // Generate new questions for each subject
-    const questionsBySubject: Record<string, any> = {};
-    for (const subject of profile.subjects) {
-      const questions = getDailyQuestions(subject, profile.grade, 20);
-      questionsBySubject[subject] = questions;
-    }
-
-    try {
-      // Send email with questions
-      await sendDailyQuestions(
-        req.user.email,
-        req.user.firstName,
-        questionsBySubject
-      );
-      log(`Questions email sent to ${req.user.email}`);
-    } catch (error) {
-      log(`Failed to send questions email: ${error}`);
-      // Continue even if email fails - don't block the API response
-    }
-
-    res.json(questionsBySubject);
-  });
-
-
-  // Cleanup intervals on logout
-  app.post("/api/logout", (req, res, next) => {
-    if (req.user?.id && activeIntervals.has(req.user.id)) {
-      clearInterval(activeIntervals.get(req.user.id));
-      activeIntervals.delete(req.user.id);
-      log(`Cleared periodic questions for user ${req.user.id}`);
-    }
-    req.logout((err) => {
-      if (err) return next(err);
-      res.sendStatus(200);
-    });
-  });
-
   const httpServer = createServer(app);
   return httpServer;
 }

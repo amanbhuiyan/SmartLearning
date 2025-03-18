@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { loadStripe } from '@stripe/stripe-js';
-import type { Stripe } from '@stripe/stripe-js';
 import {
   Elements,
   PaymentElement,
@@ -19,7 +18,6 @@ if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
   throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
 }
 
-// Initialize Stripe with the public key
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 interface StripeResponse {
@@ -112,20 +110,18 @@ export default function Subscribe() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // If user is not authenticated, redirect to auth page
-    if (!user) {
-      setLocation("/auth");
-      return;
-    }
-
-    // Already subscribed users should be redirected to dashboard
-    if (user.isSubscribed) {
-      setLocation("/");
-      return;
-    }
-
     const initializePayment = async () => {
       try {
+        if (!user) {
+          setLocation("/auth");
+          return;
+        }
+
+        if (user.isSubscribed) {
+          setLocation("/dashboard");
+          return;
+        }
+
         const response = await apiRequest<StripeResponse>('/api/get-or-create-subscription', {
           method: 'POST',
         });
@@ -174,11 +170,11 @@ export default function Subscribe() {
             {error ? (
               <div className="text-center space-y-4">
                 <p className="text-destructive">{error}</p>
-                <Button onClick={() => setLocation("/")}>
+                <Button onClick={() => setLocation("/dashboard")}>
                   Return to Dashboard
                 </Button>
               </div>
-            ) : clientSecret && stripePromise ? (
+            ) : clientSecret ? (
               <Elements 
                 stripe={stripePromise} 
                 options={{
