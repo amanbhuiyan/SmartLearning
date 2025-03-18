@@ -10,16 +10,12 @@ if (!process.env.BREVO_API_KEY) {
 
 let apiInstance: SibApiV3Sdk.TransactionalEmailsApi | null = null;
 
-// Initialize the API client properly
 try {
   log("Initializing Brevo API client...");
-  const defaultClient = SibApiV3Sdk.ApiClient.instance;
-  if (!defaultClient.authentications['api-key']) {
-    defaultClient.authentications['api-key'] = { apiKey: process.env.BREVO_API_KEY || '' };
-  } else {
-    defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY || '';
-  }
   apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+  const apiKey = new SibApiV3Sdk.ApiKeyAuth('header', 'api-key');
+  apiKey.apiKey = process.env.BREVO_API_KEY || '';
+  apiInstance.setDefaultAuthentication(apiKey);
   log("Brevo API client initialized successfully");
 } catch (error) {
   log(`Error initializing Brevo API client: ${error}`);
