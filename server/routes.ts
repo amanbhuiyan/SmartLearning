@@ -6,11 +6,11 @@ import { insertProfileSchema } from "@shared/schema";
 import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
 import { log } from "./vite";
+import Stripe from 'stripe';
 
-let stripe: any;
+let stripe: Stripe | undefined;
 try {
   if (process.env.STRIPE_SECRET_KEY) {
-    const Stripe = require("stripe");
     stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: "2023-10-16",
     });
@@ -85,6 +85,12 @@ function startPeriodicQuestions(userId: number) {
   sendQuestionsToUser(userId);
 
   log(`Started periodic questions for user ${userId}`);
+}
+
+// Add type safety for subscription response
+interface StripeSubscriptionResponse {
+  subscriptionId: string;
+  clientSecret: string | undefined;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -237,20 +243,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const user = req.user;
 
-    if (user.stripeSubscriptionId) {
-      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-      res.send({
-        subscriptionId: subscription.id,
-        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
-      });
-      return;
-    }
-
     try {
+      // Check existing subscription
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        const response: StripeSubscriptionResponse = {
+          subscriptionId: subscription.id,
+          clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+        };
+        res.json(response);
+        return;
+      }
+
+      // Create new customer and subscription
       const customer = await stripe.customers.create({
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
       });
+
+      if (!process.env.STRIPE_PRICE_ID) {
+        throw new Error('STRIPE_PRICE_ID is not configured');
+      }
 
       const subscription = await stripe.subscriptions.create({
         customer: customer.id,
@@ -258,20 +271,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           price: process.env.STRIPE_PRICE_ID,
         }],
         payment_behavior: 'default_incomplete',
+        payment_settings: {
+          payment_method_types: ['card'],
+          save_default_payment_method: 'on_subscription',
+        },
         expand: ['latest_invoice.payment_intent'],
       });
 
+      // Update user with Stripe info
       await storage.updateUserStripeInfo(user.id, {
         customerId: customer.id,
         subscriptionId: subscription.id
       });
 
-      res.send({
+      // Type assertion to ensure proper structure
+      const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
+      const paymentIntent = latestInvoice.payment_intent as Stripe.PaymentIntent;
+
+      const response: StripeSubscriptionResponse = {
         subscriptionId: subscription.id,
-        clientSecret: subscription.latest_invoice.payment_intent.client_secret,
-      });
+        clientSecret: paymentIntent.client_secret,
+      };
+
+      res.json(response);
     } catch (error: any) {
-      res.status(400).send({ error: { message: error.message } });
+      log(`Subscription error: ${error.message}`);
+      res.status(400).json({ 
+        error: { 
+          message: error.message || 'Failed to create subscription'
+        } 
+      });
     }
   });
 
