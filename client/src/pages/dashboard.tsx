@@ -71,7 +71,9 @@ export default function Dashboard() {
     );
   }
 
-  const subjectDisplay = profile.subject.charAt(0).toUpperCase() + profile.subject.slice(1);
+  const subjectsDisplay = profile.subjects.map(s => 
+    s.charAt(0).toUpperCase() + s.slice(1)
+  ).join(", ");
   const today = format(new Date(), "EEEE, MMMM do");
   const isTrialActive = user?.trialEndsAt && new Date(user.trialEndsAt) > new Date();
   const trialEndsDate = user?.trialEndsAt ? format(new Date(user.trialEndsAt), "MMMM do") : null;
@@ -109,9 +111,10 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{subjectDisplay} - Year {profile.grade}</CardTitle>
+            <CardTitle>{subjectsDisplay} - Year {profile.grade}</CardTitle>
             <CardDescription>
               Today's learning questions. Click on each question to see the answer and explanation.
+              These questions have also been sent to your email address.
             </CardDescription>
           </CardHeader>
           <CardContent>

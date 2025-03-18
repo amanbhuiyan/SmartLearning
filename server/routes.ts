@@ -30,7 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profile = await storage.createStudentProfile({
         ...data,
         userId: req.user.id,
-        lastQuestionDate: new Date(),
+        lastQuestionDate: new Date().toISOString(),
       });
       res.json(profile);
     } catch (err) {
@@ -60,8 +60,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    const questions = await storage.getDailyQuestions(profile.subject, profile.grade);
-    res.json(questions);
+    // Get questions for all selected subjects
+    let allQuestions = [];
+    for (const subject of profile.subjects) {
+      const questions = await storage.getDailyQuestions(subject, profile.grade);
+      allQuestions = [...allQuestions, ...questions];
+    }
+
+    // Limit to 20 questions
+    const limitedQuestions = allQuestions.slice(0, 20);
+
+    // TODO: Send email with questions
+    // We'll need to set up an email service (like SendGrid) to implement this
+    // For now, just return the questions
+    res.json(limitedQuestions);
   });
 
   // Subscription route - disabled when Stripe is not configured
@@ -89,7 +101,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const customer = await stripe.customers.create({
-        name: user.username,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
       });
 
       const subscription = await stripe.subscriptions.create({
