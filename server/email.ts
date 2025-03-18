@@ -10,11 +10,9 @@ let apiInstance: SibApiV3Sdk.TransactionalEmailsApi | null = null;
 
 try {
   log("Initializing Brevo API client...");
-  const defaultClient = new SibApiV3Sdk.ApiClient();
-  defaultClient.authentications['api-key'] = {
-    apiKey: process.env.BREVO_API_KEY
-  };
-
+  const defaultClient = SibApiV3Sdk.ApiClient();
+  defaultClient.authentications['api-key'] = new SibApiV3Sdk.ApiKeyAuth('header', 'api-key');
+  defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
   apiInstance = new SibApiV3Sdk.TransactionalEmailsApi(defaultClient);
   log("Brevo API client initialized successfully");
 } catch (error) {
@@ -67,7 +65,7 @@ export async function sendDailyQuestions(
     log("Creating email payload...");
 
     const emailData = {
-      to: [{ email, name: firstName }],
+      to: [{ email: email, name: firstName }],
       sender: { 
         email: "noreply@eduquest.com",
         name: "EduQuest Learning"
@@ -83,7 +81,7 @@ export async function sendDailyQuestions(
 
     log("Sending email via Brevo API...");
     const response = await apiInstance.sendTransacEmail(emailData);
-    log(`Email sent successfully!`);
+    log(`Email sent successfully! Response: ${JSON.stringify(response)}`);
 
   } catch (error: any) {
     log(`Failed to send email to ${email}`);
