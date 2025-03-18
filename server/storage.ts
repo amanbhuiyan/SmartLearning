@@ -142,12 +142,15 @@ export class DatabaseStorage implements IStorage {
 
   async getDailyQuestions(subject: string, grade: number): Promise<Question[]> {
     try {
-      return await db
+      const results = await db
         .select()
         .from(questions)
         .where(eq(questions.subject, subject))
         .where(eq(questions.grade, grade))
         .limit(20);
+
+      log(`Retrieved ${results.length} questions for subject: ${subject}, grade: ${grade}`);
+      return results;
     } catch (err) {
       log(`Error getting daily questions: ${err.message}`);
       throw err;
