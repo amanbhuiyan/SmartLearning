@@ -1,7 +1,10 @@
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { insertUserSchema } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
-import { InsertUser, insertUserSchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -12,74 +15,76 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Redirect } from "wouter";
+import { GraduationCap } from "lucide-react";
+
+const formSchema = insertUserSchema.extend({
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
 
 export default function AuthPage() {
+  const [, setLocation] = useLocation();
   const { user, loginMutation, registerMutation } = useAuth();
 
-  const loginForm = useForm({
+  useEffect(() => {
+    if (user) {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       username: "",
       password: "",
     },
   });
 
-  const registerForm = useForm({
-    resolver: zodResolver(insertUserSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-      subjectPreference: "math",
-      gradeLevel: "year1",
-    },
-  });
-
-  if (user) {
-    return <Redirect to="/" />;
-  }
+  const onSubmit = async (data: z.infer<typeof formSchema>, isLogin: boolean) => {
+    if (isLogin) {
+      await loginMutation.mutateAsync(data);
+    } else {
+      await registerMutation.mutateAsync(data);
+    }
+  };
 
   return (
-    <div className="min-h-screen grid md:grid-cols-2">
-      <div className="flex items-center justify-center p-8">
-        <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+      <div className="w-full max-w-5xl grid md:grid-cols-2 gap-8">
+        <div className="flex flex-col justify-center space-y-6">
+          <div className="flex items-center gap-2">
+            <GraduationCap className="h-12 w-12 text-primary" />
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-indigo-600 text-transparent bg-clip-text">
+              EduQuest
+            </h1>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold text-gray-900">
+              Daily Learning Made Fun
+            </h2>
+            <p className="text-gray-600">
+              Get daily questions tailored to your child's grade level in Math or English.
+              Start with a free week trial, then just £2/week.
+            </p>
+          </div>
+        </div>
+
+        <Card className="w-full">
           <CardHeader>
-            <CardTitle>Educational Platform</CardTitle>
-            <CardDescription>
-              Sign in to access daily educational questions
-            </CardDescription>
+            <CardTitle>Welcome</CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login">
+            <Tabs defaultValue="login" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="register">Register</TabsTrigger>
               </TabsList>
-
               <TabsContent value="login">
-                <Form {...loginForm}>
-                  <form
-                    onSubmit={loginForm.handleSubmit((data) =>
-                      loginMutation.mutate(data)
-                    )}
-                    className="space-y-4"
-                  >
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit((data) => onSubmit(data, true))} className="space-y-4">
                     <FormField
-                      control={loginForm.control}
+                      control={form.control}
                       name="username"
                       render={({ field }) => (
                         <FormItem>
@@ -92,7 +97,7 @@ export default function AuthPage() {
                       )}
                     />
                     <FormField
-                      control={loginForm.control}
+                      control={form.control}
                       name="password"
                       render={({ field }) => (
                         <FormItem>
@@ -104,27 +109,21 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
-                    <Button
-                      type="submit"
+                    <Button 
+                      type="submit" 
                       className="w-full"
                       disabled={loginMutation.isPending}
                     >
-                      Login
+                      {loginMutation.isPending ? "Logging in..." : "Login"}
                     </Button>
                   </form>
                 </Form>
               </TabsContent>
-
               <TabsContent value="register">
-                <Form {...registerForm}>
-                  <form
-                    onSubmit={registerForm.handleSubmit((data) =>
-                      registerMutation.mutate(data as InsertUser)
-                    )}
-                    className="space-y-4"
-                  >
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit((data) => onSubmit(data, false))} className="space-y-4">
                     <FormField
-                      control={registerForm.control}
+                      control={form.control}
                       name="username"
                       render={({ field }) => (
                         <FormItem>
@@ -137,7 +136,7 @@ export default function AuthPage() {
                       )}
                     />
                     <FormField
-                      control={registerForm.control}
+                      control={form.control}
                       name="password"
                       render={({ field }) => (
                         <FormItem>
@@ -149,65 +148,12 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={registerForm.control}
-                      name="subjectPreference"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Subject</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select subject" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="math">Math</SelectItem>
-                              <SelectItem value="english">English</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="gradeLevel"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Grade Level</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select grade" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {["year1", "year2", "year3", "year4", "year5", "year6"].map(
-                                (year) => (
-                                  <SelectItem key={year} value={year}>
-                                    Year {year.charAt(year.length - 1)}
-                                  </SelectItem>
-                                )
-                              )}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="submit"
+                    <Button 
+                      type="submit" 
                       className="w-full"
                       disabled={registerMutation.isPending}
                     >
-                      Register
+                      {registerMutation.isPending ? "Creating account..." : "Create Account"}
                     </Button>
                   </form>
                 </Form>
@@ -215,31 +161,6 @@ export default function AuthPage() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
-      <div className="hidden md:flex items-center justify-center bg-muted p-8">
-        <div className="max-w-md space-y-4 text-center">
-          <h1 className="text-4xl font-bold tracking-tight">
-            Daily Educational Questions
-          </h1>
-          <p className="text-muted-foreground">
-            Help your child excel with our daily practice questions. Choose from Math
-            or English, tailored to their grade level.
-          </p>
-          <div className="grid grid-cols-2 gap-4 mt-8">
-            <div className="p-4 rounded-lg bg-card">
-              <h3 className="font-semibold">Mathematics</h3>
-              <p className="text-sm text-muted-foreground">
-                From basic arithmetic to problem solving
-              </p>
-            </div>
-            <div className="p-4 rounded-lg bg-card">
-              <h3 className="font-semibold">English</h3>
-              <p className="text-sm text-muted-foreground">
-                Grammar, vocabulary, and comprehension
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

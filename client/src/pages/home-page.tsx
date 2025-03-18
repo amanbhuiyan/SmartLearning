@@ -1,66 +1,129 @@
-import { useQuery } from "@tanstack/react-query";
-import { Question } from "@shared/schema";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { insertProfileSchema } from "@shared/schema";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function HomePage() {
-  const { user, logoutMutation } = useAuth();
-  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
 
-  const { data: questions, error } = useQuery<Question[]>({
-    queryKey: ["/api/questions"],
+  const { data: profile } = useQuery({
+    queryKey: ["/api/profile"],
   });
 
-  if (error) {
-    if ((error as any).status === 402) {
-      return (
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Subscription Required</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4">Please subscribe to access daily questions.</p>
-              <Link href="/subscribe">
-                <Button>Subscribe Now</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      );
+  const form = useForm({
+    resolver: zodResolver(insertProfileSchema),
+    defaultValues: {
+      subject: "",
+      grade: undefined,
+    },
+  });
+
+  const onSubmit = async (data: any) => {
+    await apiRequest("POST", "/api/profile", data);
+    setLocation("/dashboard");
+  };
+
+  useEffect(() => {
+    if (profile) {
+      setLocation("/dashboard");
     }
-  }
+    if (!user?.isSubscribed && !user?.trialEndsAt) {
+      setLocation("/subscribe");
+    }
+  }, [profile, user, setLocation]);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Welcome, {user?.username}!</h1>
-        <Button variant="outline" onClick={() => logoutMutation.mutate()}>
-          Logout
-        </Button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
+      <div className="max-w-2xl mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle>Setup Your Learning Profile</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="subject"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Subject</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a subject" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="math">Mathematics</SelectItem>
+                          <SelectItem value="english">English</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-      <div className="grid gap-6">
-        {questions?.map((q) => (
-          <Card key={q.id}>
-            <CardHeader>
-              <CardTitle>Question {q.id}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4">{q.question}</p>
-              <details className="text-sm">
-                <summary className="cursor-pointer text-primary">Show Answer</summary>
-                <p className="mt-2">{q.answer}</p>
-                {q.explanation && (
-                  <p className="mt-2 text-muted-foreground">{q.explanation}</p>
-                )}
-              </details>
-            </CardContent>
-          </Card>
-        ))}
+                <FormField
+                  control={form.control}
+                  name="grade"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Grade Level</FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                        defaultValue={field.value?.toString()}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select grade level" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5, 6].map((grade) => (
+                            <SelectItem key={grade} value={grade.toString()}>
+                              Year {grade}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button type="submit" className="w-full">
+                  Start Learning
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

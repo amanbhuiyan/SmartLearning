@@ -1,49 +1,85 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
-import { getQuestions } from "./questions";
-import Stripe from "stripe";
 import { storage } from "./storage";
+import { insertProfileSchema } from "@shared/schema";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+let stripe: any;
+try {
+  if (process.env.STRIPE_SECRET_KEY) {
+    const Stripe = require("stripe");
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2023-10-16",
+    });
+  }
+} catch (error) {
+  console.warn("Stripe integration disabled - missing configuration");
 }
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16",
-});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
-  app.get("/api/questions", async (req, res) => {
+  // Student profile routes
+  app.post('/api/profile', async (req, res) => {
     if (!req.isAuthenticated()) {
-      return res.sendStatus(401);
+      return res.status(401).send("Not authenticated");
     }
 
-    const user = req.user;
-    if (!user.stripeSubscriptionId && (!user.trialEndsAt || user.trialEndsAt < new Date())) {
-      return res.status(402).json({ message: "Subscription required" });
+    try {
+      const data = insertProfileSchema.parse(req.body);
+      const profile = await storage.createStudentProfile({
+        ...data,
+        userId: req.user.id,
+        lastQuestionDate: new Date(),
+      });
+      res.json(profile);
+    } catch (err) {
+      res.status(400).json({ error: "Invalid profile data" });
+    }
+  });
+
+  app.get('/api/profile', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
     }
 
-    const questions = getQuestions(
-      user.subjectPreference || "math",
-      user.gradeLevel || "year1"
-    );
+    const profile = await storage.getStudentProfile(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    res.json(profile);
+  });
 
+  app.get('/api/questions', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const profile = await storage.getStudentProfile(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const questions = await storage.getDailyQuestions(profile.subject, profile.grade);
     res.json(questions);
   });
 
+  // Subscription route - disabled when Stripe is not configured
   app.post('/api/get-or-create-subscription', async (req, res) => {
+    if (!stripe) {
+      return res.status(503).json({ 
+        message: "Subscription service temporarily unavailable" 
+      });
+    }
+
     if (!req.isAuthenticated()) {
-      return res.sendStatus(401);
+      return res.status(401).send("Not authenticated");
     }
 
     const user = req.user;
 
     if (user.stripeSubscriptionId) {
       const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-      
       res.send({
         subscriptionId: subscription.id,
         clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
@@ -53,7 +89,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const customer = await stripe.customers.create({
-        email: user.username + "@example.com", // Using username as email for demo
         name: user.username,
       });
 
@@ -70,13 +105,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId: customer.id,
         subscriptionId: subscription.id
       });
-  
+
       res.send({
         subscriptionId: subscription.id,
-        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret,
       });
     } catch (error: any) {
-      return res.status(400).send({ error: { message: error.message } });
+      res.status(400).send({ error: { message: error.message } });
     }
   });
 
