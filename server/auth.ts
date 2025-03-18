@@ -58,18 +58,19 @@ export function setupAuth(app: Express) {
           const user = await storage.getUserByEmail(email);
           if (!user) {
             log(`Login failed: User not found for email: ${email}`);
-            return done(null, false);
+            return done(null, false, { message: "Invalid email or password" });
           }
           const isValid = await comparePasswords(password, user.password);
           if (!isValid) {
             log(`Login failed: Invalid password for email: ${email}`);
-            return done(null, false);
+            return done(null, false, { message: "Invalid email or password" });
           }
           log(`Login successful for email: ${email}`);
           return done(null, user);
         } catch (err) {
-          log(`Login error: ${err.message}`);
-          return done(err);
+          const error = err as Error;
+          log(`Login error: ${error.message}`);
+          return done(error);
         }
       }
     )
@@ -81,7 +82,8 @@ export function setupAuth(app: Express) {
       const user = await storage.getUser(id);
       done(null, user);
     } catch (err) {
-      done(err);
+      const error = err as Error;
+      done(error);
     }
   });
 
@@ -91,7 +93,7 @@ export function setupAuth(app: Express) {
       const existingUser = await storage.getUserByEmail(req.body.email);
       if (existingUser) {
         log(`Registration failed: Email already exists: ${req.body.email}`);
-        return res.status(400).send("Email already exists");
+        return res.status(400).json({ message: "Email already exists" });
       }
 
       const hashedPassword = await hashPassword(req.body.password);
@@ -109,13 +111,23 @@ export function setupAuth(app: Express) {
         res.status(201).json(user);
       });
     } catch (err) {
-      log(`Registration error: ${err.message}`);
-      next(err);
+      const error = err as Error;
+      log(`Registration error: ${error.message}`);
+      next(error);
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+  app.post("/api/login", (req, res, next) => {
+    passport.authenticate("local", (err, user, info) => {
+      if (err) return next(err);
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      req.logIn(user, (err) => {
+        if (err) return next(err);
+        res.json(user);
+      });
+    })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {

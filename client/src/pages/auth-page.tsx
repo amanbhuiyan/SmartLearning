@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraduationCap } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const registerFormSchema = insertUserSchema.extend({
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -26,6 +27,7 @@ const registerFormSchema = insertUserSchema.extend({
 export default function AuthPage() {
   const [, setLocation] = useLocation();
   const { user, loginMutation, registerMutation } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
@@ -50,6 +52,22 @@ export default function AuthPage() {
       lastName: "",
     },
   });
+
+  const handleLoginError = (error: any) => {
+    toast({
+      variant: "destructive",
+      title: "Login Failed",
+      description: error.response?.data?.message || "Please check your credentials and try again",
+    });
+  };
+
+  const handleRegisterError = (error: any) => {
+    toast({
+      variant: "destructive",
+      title: "Registration Failed",
+      description: error.response?.data?.message || "Could not create your account. Please try again.",
+    });
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
@@ -84,7 +102,12 @@ export default function AuthPage() {
               </TabsList>
               <TabsContent value="login">
                 <Form {...loginForm}>
-                  <form onSubmit={loginForm.handleSubmit((data) => loginMutation.mutateAsync(data))} className="space-y-4">
+                  <form 
+                    onSubmit={loginForm.handleSubmit(
+                      data => loginMutation.mutateAsync(data).catch(handleLoginError)
+                    )} 
+                    className="space-y-4"
+                  >
                     <FormField
                       control={loginForm.control}
                       name="email"
@@ -123,7 +146,12 @@ export default function AuthPage() {
               </TabsContent>
               <TabsContent value="register">
                 <Form {...registerForm}>
-                  <form onSubmit={registerForm.handleSubmit((data) => registerMutation.mutateAsync(data))} className="space-y-4">
+                  <form 
+                    onSubmit={registerForm.handleSubmit(
+                      data => registerMutation.mutateAsync(data).catch(handleRegisterError)
+                    )} 
+                    className="space-y-4"
+                  >
                     <FormField
                       control={registerForm.control}
                       name="firstName"
