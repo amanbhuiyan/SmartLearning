@@ -13,9 +13,9 @@ let apiInstance: SibApiV3Sdk.TransactionalEmailsApi | null = null;
 // Initialize the API client properly
 try {
   log("Initializing Brevo API client...");
-  const defaultClient = new SibApiV3Sdk.TransactionalEmailsApi();
-  defaultClient.setApiKey(SibApiV3Sdk.ApiClient.instance, process.env.BREVO_API_KEY || '');
-  apiInstance = defaultClient;
+  const defaultClient = SibApiV3Sdk.ApiClient.instance;
+  defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY || '';
+  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
   log("Brevo API client initialized successfully");
 } catch (error) {
   log(`Error initializing Brevo API client: ${error}`);

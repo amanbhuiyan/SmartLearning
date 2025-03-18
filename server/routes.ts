@@ -25,6 +25,7 @@ const activeIntervals = new Map<number, NodeJS.Timeout>();
 // Function to send questions to a specific user
 async function sendQuestionsToUser(userId: number) {
   try {
+    log(`Starting periodic questions task for user ${userId}`);
     const user = await storage.getUser(userId);
     const profile = await storage.getStudentProfile(userId);
 
@@ -33,21 +34,25 @@ async function sendQuestionsToUser(userId: number) {
       return;
     }
 
+    log(`Generating questions for user ${userId} (${user.email})`);
+
     // Generate new questions for each subject
     const questionsBySubject: Record<string, any> = {};
     for (const subject of profile.subjects) {
       const questions = getDailyQuestions(subject, profile.grade, 20);
       questionsBySubject[subject] = questions;
+      log(`Generated ${questions.length} questions for ${subject}`);
     }
 
     // Send email with questions
     try {
+      log(`Attempting to send email to ${user.email}`);
       await sendDailyQuestions(
         user.email,
         user.firstName,
         questionsBySubject
       );
-      log(`Periodic questions email sent to ${user.email}`);
+      log(`Successfully sent periodic questions email to ${user.email}`);
     } catch (error) {
       log(`Failed to send periodic questions email to ${user.email}: ${error}`);
     }
@@ -62,11 +67,21 @@ function startPeriodicQuestions(userId: number) {
   if (activeIntervals.has(userId)) {
     clearInterval(activeIntervals.get(userId));
     activeIntervals.delete(userId);
+    log(`Cleared existing periodic questions for user ${userId}`);
   }
 
   // Create new interval
-  const interval = setInterval(() => sendQuestionsToUser(userId), 60000); // Every minute
+  log(`Starting new periodic questions interval for user ${userId}`);
+  const interval = setInterval(() => {
+    log(`Triggering periodic questions for user ${userId}`);
+    sendQuestionsToUser(userId);
+  }, 60000); // Every minute
+
   activeIntervals.set(userId, interval);
+
+  // Send the first batch immediately
+  sendQuestionsToUser(userId);
+
   log(`Started periodic questions for user ${userId}`);
 }
 
