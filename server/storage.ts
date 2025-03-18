@@ -18,6 +18,8 @@ export interface IStorage {
   createStudentProfile(profile: Omit<StudentProfile, "id">): Promise<StudentProfile>;
   getDailyQuestions(subject: string, grade: number): Promise<Question[]>;
   sessionStore: session.Store;
+  getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
+  updateSubscriptionStatus(userId: number, isSubscribed: boolean): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -153,6 +155,32 @@ export class DatabaseStorage implements IStorage {
       return results;
     } catch (err) {
       log(`Error getting daily questions: ${err.message}`);
+      throw err;
+    }
+  }
+  async getUserByStripeCustomerId(customerId: string): Promise<User | undefined> {
+    try {
+      const results = await db
+        .select()
+        .from(users)
+        .where(eq(users.stripeCustomerId, customerId));
+      return results[0];
+    } catch (err) {
+      log(`Error getting user by Stripe customer ID: ${err.message}`);
+      throw err;
+    }
+  }
+
+  async updateSubscriptionStatus(userId: number, isSubscribed: boolean): Promise<User> {
+    try {
+      const result = await db
+        .update(users)
+        .set({ isSubscribed })
+        .where(eq(users.id, userId))
+        .returning();
+      return result[0];
+    } catch (err) {
+      log(`Error updating subscription status: ${err.message}`);
       throw err;
     }
   }

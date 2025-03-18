@@ -10,7 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Loader2, LogOut, CreditCard, Sparkles } from "lucide-react";
+import { Loader2, LogOut, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
@@ -77,6 +77,7 @@ export default function Dashboard() {
   const today = format(new Date(), "EEEE, MMMM do");
   const isTrialActive = user?.trialEndsAt && new Date(user.trialEndsAt) > new Date();
   const trialEndsDate = user?.trialEndsAt ? format(new Date(user.trialEndsAt), "MMMM do") : null;
+  const hasActiveSubscription = user?.subscriptionStatus === 'active'; // Added to check for active subscription
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
@@ -93,11 +94,11 @@ export default function Dashboard() {
         </div>
 
         {/* Subscription Status */}
-        {user?.isSubscribed ? (
+        {hasActiveSubscription ? (
           <Card className="border-green-200 bg-green-50">
             <CardContent className="p-4 flex items-center justify-between">
               <div className="flex items-center">
-                <Sparkles className="h-5 w-5 text-green-600 mr-2" />
+                <CreditCard className="h-5 w-5 text-green-600 mr-2" /> {/* Replaced Sparkles with CreditCard */}
                 <p className="text-green-800">
                   Active Subscription - Enjoy unlimited access to all learning materials!
                 </p>

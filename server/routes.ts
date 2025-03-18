@@ -275,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-    app.post('/api/test-email', async (req, res) => {
+  app.post('/api/test-email', async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
@@ -307,6 +307,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  // Add a webhook handler for Stripe events
+  app.post('/api/stripe-webhook', async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig as string,
+        process.env.STRIPE_WEBHOOK_SECRET as string
+      );
+    } catch (err: any) {
+      log(`Webhook Error: ${err.message}`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case 'payment_intent.succeeded':
+        const paymentIntent = event.data.object;
+        // Update user subscription status
+        try {
+          const subscription = await stripe.subscriptions.retrieve(paymentIntent.metadata.subscriptionId);
+          const user = await storage.getUser(parseInt(paymentIntent.metadata.userId));
+          if (user) {
+            await storage.updateUserStripeInfo(user.id, {
+              customerId: subscription.customer as string,
+              subscriptionId: subscription.id,
+            });
+          }
+        } catch (error) {
+          log(`Error updating subscription status: ${error}`);
+        }
+        break;
+      case 'customer.subscription.deleted':
+        const subscription = event.data.object;
+        // Handle subscription cancellation
+        try {
+          const user = await storage.getUserByStripeCustomerId(subscription.customer as string);
+          if (user) {
+            await storage.updateSubscriptionStatus(user.id, false);
+          }
+        } catch (error) {
+          log(`Error handling subscription deletion: ${error}`);
+        }
+        break;
+      default:
+        log(`Unhandled event type ${event.type}`);
+    }
+
+    res.json({ received: true });
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
