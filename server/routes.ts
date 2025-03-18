@@ -47,6 +47,7 @@ async function sendQuestionsToUser(userId: number) {
     // Send email with questions
     try {
       log(`Attempting to send email to ${user.email}`);
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5-second delay
       await sendDailyQuestions(
         user.email,
         user.firstName,

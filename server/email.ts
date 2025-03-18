@@ -60,7 +60,7 @@ export async function sendDailyQuestions(
 
     log("Sending email via Resend API...");
     const { data, error } = await resend.emails.send({
-      from: 'EduQuest <noreply@asn-global.co.uk>',  // Using your domain
+      from: 'Smart Learning <info@asn-global.co.uk>',  // Using your domain
       to: [email],
       subject: 'Your Daily Learning Questions',
       html: emailHtml,
@@ -69,11 +69,11 @@ export async function sendDailyQuestions(
 
     if (error) {
       log(`Resend API Error: ${JSON.stringify(error)}`);
-      // If domain verification error, fall back to resend.dev domain
+      // If domain verification error, fall back to resend.dev domain...
       if (error.statusCode === 403 && error.message?.includes('domain is not verified')) {
         log('Falling back to resend.dev domain...');
         const fallbackResponse = await resend.emails.send({
-          from: 'onboarding@resend.dev',
+          from: 'Smart Learning <onboarding@resend.dev>',  // Using Resend's verified domain
           to: [email],
           subject: 'Your Daily Learning Questions',
           html: emailHtml,
