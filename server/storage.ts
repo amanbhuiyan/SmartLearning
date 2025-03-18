@@ -1,8 +1,12 @@
 import { User, StudentProfile, Question, InsertUser } from "@shared/schema";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import { users, studentProfiles, questions } from "@shared/schema";
+import connectPg from "connect-pg-simple";
+import { log } from "./vite";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -16,115 +20,139 @@ export interface IStorage {
   sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private profiles: Map<number, StudentProfile>;
-  private questions: Question[];
+export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
-  currentId: number;
 
   constructor() {
-    this.users = new Map();
-    this.profiles = new Map();
-    this.questions = this.generateSampleQuestions();
-    this.currentId = 1;
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL environment variable is required");
+    }
+
+    this.sessionStore = new PostgresSessionStore({
+      conObject: {
+        connectionString: process.env.DATABASE_URL,
+      },
+      createTableIfMissing: true,
     });
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    try {
+      log(`Getting user by id: ${id}`);
+      const results = await db.select().from(users).where(eq(users.id, id));
+      log(`Found user: ${results[0] ? 'yes' : 'no'}`);
+      return results[0];
+    } catch (err) {
+      log(`Error getting user by id: ${err.message}`);
+      throw err;
+    }
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email === email,
-    );
+    try {
+      log(`Getting user by email: ${email}`);
+      const results = await db.select().from(users).where(eq(users.email, email));
+      log(`Found user by email: ${results[0] ? 'yes' : 'no'}`);
+      return results[0];
+    } catch (err) {
+      log(`Error getting user by email: ${err.message}`);
+      throw err;
+    }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentId++;
-    const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+    try {
+      log(`Creating user with data: ${JSON.stringify(insertUser)}`);
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 7);
 
-    const user: User = { 
-      ...insertUser, 
-      id,
-      isSubscribed: false,
-      trialEndsAt,
-      stripeCustomerId: null,
-      stripeSubscriptionId: null
-    };
-    this.users.set(id, user);
-    return user;
+      const result = await db.insert(users).values({
+        ...insertUser,
+        isSubscribed: false,
+        trialEndsAt: trialEndsAt.toISOString(),
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      }).returning();
+
+      log(`User created successfully: ${JSON.stringify(result[0])}`);
+      return result[0];
+    } catch (err) {
+      log(`Error creating user: ${err.message}`);
+      throw err;
+    }
   }
 
   async updateStripeCustomerId(userId: number, customerId: string): Promise<User> {
-    const user = await this.getUser(userId);
-    if (!user) throw new Error("User not found");
-
-    const updated = { ...user, stripeCustomerId: customerId };
-    this.users.set(userId, updated);
-    return updated;
+    try {
+      const result = await db
+        .update(users)
+        .set({ stripeCustomerId: customerId })
+        .where(eq(users.id, userId))
+        .returning();
+      return result[0];
+    } catch (err) {
+      log(`Error updating stripe customer id: ${err.message}`);
+      throw err;
+    }
   }
 
   async updateUserStripeInfo(userId: number, info: { customerId: string, subscriptionId: string }): Promise<User> {
-    const user = await this.getUser(userId);
-    if (!user) throw new Error("User not found");
-
-    const updated = { 
-      ...user, 
-      stripeCustomerId: info.customerId,
-      stripeSubscriptionId: info.subscriptionId,
-      isSubscribed: true
-    };
-    this.users.set(userId, updated);
-    return updated;
+    try {
+      const result = await db
+        .update(users)
+        .set({
+          stripeCustomerId: info.customerId,
+          stripeSubscriptionId: info.subscriptionId,
+          isSubscribed: true,
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      return result[0];
+    } catch (err) {
+      log(`Error updating user stripe info: ${err.message}`);
+      throw err;
+    }
   }
 
   async getStudentProfile(userId: number): Promise<StudentProfile | undefined> {
-    return Array.from(this.profiles.values()).find(
-      (profile) => profile.userId === userId
-    );
+    try {
+      const results = await db
+        .select()
+        .from(studentProfiles)
+        .where(eq(studentProfiles.userId, userId));
+      return results[0];
+    } catch (err) {
+      log(`Error getting student profile: ${err.message}`);
+      throw err;
+    }
   }
 
   async createStudentProfile(profile: Omit<StudentProfile, "id">): Promise<StudentProfile> {
-    const id = this.currentId++;
-    const newProfile = { ...profile, id };
-    this.profiles.set(id, newProfile);
-    return newProfile;
+    try {
+      const result = await db
+        .insert(studentProfiles)
+        .values(profile)
+        .returning();
+      return result[0];
+    } catch (err) {
+      log(`Error creating student profile: ${err.message}`);
+      throw err;
+    }
   }
 
   async getDailyQuestions(subject: string, grade: number): Promise<Question[]> {
-    return this.questions
-      .filter(q => q.subject === subject && q.grade === grade)
-      .slice(0, 20);
-  }
-
-  private generateSampleQuestions(): Question[] {
-    const questions: Question[] = [];
-    const subjects = ['math', 'english'];
-    const grades = [1, 2, 3, 4, 5, 6];
-
-    let id = 1;
-    for (const subject of subjects) {
-      for (const grade of grades) {
-        for (let i = 0; i < 30; i++) {
-          questions.push({
-            id: id++,
-            subject,
-            grade,
-            question: `Sample ${subject} question ${i + 1} for grade ${grade}`,
-            answer: `Sample answer ${i + 1}`,
-            explanation: `Sample explanation ${i + 1}`
-          });
-        }
-      }
+    try {
+      return await db
+        .select()
+        .from(questions)
+        .where(eq(questions.subject, subject))
+        .where(eq(questions.grade, grade))
+        .limit(20);
+    } catch (err) {
+      log(`Error getting daily questions: ${err.message}`);
+      throw err;
     }
-
-    return questions;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

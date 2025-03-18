@@ -6,6 +6,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import { log } from "./vite";
 
 declare global {
   namespace Express {
@@ -53,12 +54,21 @@ export function setupAuth(app: Express) {
       { usernameField: 'email' },
       async (email, password, done) => {
         try {
+          log(`Login attempt for email: ${email}`);
           const user = await storage.getUserByEmail(email);
-          if (!user || !(await comparePasswords(password, user.password))) {
+          if (!user) {
+            log(`Login failed: User not found for email: ${email}`);
             return done(null, false);
           }
+          const isValid = await comparePasswords(password, user.password);
+          if (!isValid) {
+            log(`Login failed: Invalid password for email: ${email}`);
+            return done(null, false);
+          }
+          log(`Login successful for email: ${email}`);
           return done(null, user);
         } catch (err) {
+          log(`Login error: ${err.message}`);
           return done(err);
         }
       }
@@ -77,21 +87,29 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
+      log(`Registration attempt with data: ${JSON.stringify(req.body)}`);
       const existingUser = await storage.getUserByEmail(req.body.email);
       if (existingUser) {
+        log(`Registration failed: Email already exists: ${req.body.email}`);
         return res.status(400).send("Email already exists");
       }
 
+      const hashedPassword = await hashPassword(req.body.password);
       const user = await storage.createUser({
         ...req.body,
-        password: await hashPassword(req.body.password),
+        password: hashedPassword,
       });
+      log(`User created successfully: ${JSON.stringify(user)}`);
 
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          log(`Login after registration failed: ${err.message}`);
+          return next(err);
+        }
         res.status(201).json(user);
       });
     } catch (err) {
+      log(`Registration error: ${err.message}`);
       next(err);
     }
   });
