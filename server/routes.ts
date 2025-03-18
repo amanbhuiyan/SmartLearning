@@ -19,6 +19,40 @@ try {
   console.warn("Stripe integration disabled - missing configuration");
 }
 
+// Function to send questions to a specific user
+async function sendQuestionsToUser(userId: number) {
+  try {
+    const user = await storage.getUser(userId);
+    const profile = await storage.getStudentProfile(userId);
+
+    if (!user || !profile) {
+      log(`Cannot send questions: User ${userId} or profile not found`);
+      return;
+    }
+
+    // Generate new questions for each subject
+    const questionsBySubject: Record<string, any> = {};
+    for (const subject of profile.subjects) {
+      const questions = getDailyQuestions(subject, profile.grade, 20);
+      questionsBySubject[subject] = questions;
+    }
+
+    // Send email with questions
+    try {
+      await sendDailyQuestions(
+        user.email,
+        user.firstName,
+        questionsBySubject
+      );
+      log(`Periodic questions email sent to ${user.email}`);
+    } catch (error) {
+      log(`Failed to send periodic questions email to ${user.email}: ${error}`);
+    }
+  } catch (error) {
+    log(`Error in periodic questions task for user ${userId}: ${error}`);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
@@ -35,6 +69,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.user.id,
         lastQuestionDate: new Date().toISOString(),
       });
+
+      // Start sending periodic questions to this user
+      setInterval(() => sendQuestionsToUser(req.user.id), 60000); // Every minute
+
       res.json(profile);
     } catch (err) {
       res.status(400).json({ error: "Invalid profile data" });
@@ -50,6 +88,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
     }
+
+    // Start sending periodic questions to this user
+    setInterval(() => sendQuestionsToUser(req.user.id), 60000); // Every minute
+
     res.json(profile);
   });
 
@@ -86,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(questionsBySubject);
   });
 
-  // Subscription route - disabled when Stripe is not configured
+  // Subscription routes remain unchanged
   app.post('/api/get-or-create-subscription', async (req, res) => {
     if (!stripe) {
       return res.status(503).json({ 
