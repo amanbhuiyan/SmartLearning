@@ -41,6 +41,11 @@ const SubscribeForm = ({ clientSecret }: SubscribeFormProps) => {
     e.preventDefault();
 
     if (!stripe || !elements) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Payment system not initialized properly",
+      });
       return;
     }
 
@@ -110,30 +115,46 @@ export default function Subscribe() {
   const { toast } = useToast();
 
   useEffect(() => {
+    if (!user) {
+      setLocation("/auth");
+      return;
+    }
+
+    if (user.isSubscribed) {
+      setLocation("/dashboard");
+      return;
+    }
+
     const initializePayment = async () => {
       try {
-        if (!user) {
-          setLocation("/auth");
-          return;
-        }
-
-        if (user.isSubscribed) {
-          setLocation("/dashboard");
-          return;
-        }
-
-        const response = await apiRequest<StripeResponse>('/api/get-or-create-subscription', {
+        console.log("Initializing payment...");
+        const response = await fetch('/api/get-or-create-subscription', {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
         });
 
-        if (response?.clientSecret) {
-          setClientSecret(response.clientSecret);
-        } else {
-          throw new Error('Invalid response from server');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        const data = await response.json();
+        console.log("Payment initialization response:", data);
+
+        if (data.error) {
+          throw new Error(data.error.message || 'Failed to initialize payment');
+        }
+
+        if (!data.clientSecret) {
+          throw new Error('No client secret received');
+        }
+
+        setClientSecret(data.clientSecret);
       } catch (err: any) {
-        const errorMessage = err?.message || 'Failed to initialize payment. Please try again later.';
         console.error('Failed to initialize payment:', err);
+        const errorMessage = err.message || 'Failed to initialize payment. Please try again later.';
         setError(errorMessage);
         toast({
           variant: "destructive",
