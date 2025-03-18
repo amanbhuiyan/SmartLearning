@@ -29,8 +29,8 @@ export async function sendDailyQuestions(
     <html>
       <body style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Hello ${firstName}!</h2>
-        <p style="color: #2563eb; font-weight: bold;">This is a test email from EduQuest Learning Platform.</p>
-        <p>Here are your daily learning questions:</p>
+        <p style="color: #2563eb; font-weight: bold;">Welcome to your daily EduQuest learning questions!</p>
+        <p>Here are your personalized questions for today:</p>
   `;
 
   Object.entries(questionsBySubject).forEach(([subject, questions]) => {
@@ -42,10 +42,10 @@ export async function sendDailyQuestions(
   });
 
   emailHtml += `
-        <p style="margin-top: 20px;">Good luck with your learning journey!</p>
+        <p style="margin-top: 20px;">Keep learning and growing!</p>
+        <p style="margin-top: 10px; color: #4B5563;">Best regards,<br>The EduQuest Team</p>
         <hr>
-        <p style="color: #666; font-size: 12px;">This is a test email sent on ${new Date().toLocaleString()}. 
-        If you received this email, it means our email system is working correctly.</p>
+        <p style="color: #666; font-size: 12px;">Sent via EduQuest Learning Platform on ${new Date().toLocaleString()}</p>
       </body>
     </html>
   `;
@@ -60,7 +60,7 @@ export async function sendDailyQuestions(
 
     log("Sending email via Resend API...");
     const { data, error } = await resend.emails.send({
-      from: 'onboarding@resend.dev',  // Using Resend's verified domain
+      from: 'EduQuest <noreply@asn-global.co.uk>',  // Using your domain
       to: [email],
       subject: 'Your Daily Learning Questions',
       html: emailHtml,
@@ -69,6 +69,24 @@ export async function sendDailyQuestions(
 
     if (error) {
       log(`Resend API Error: ${JSON.stringify(error)}`);
+      // If domain verification error, fall back to resend.dev domain
+      if (error.statusCode === 403 && error.message?.includes('domain is not verified')) {
+        log('Falling back to resend.dev domain...');
+        const fallbackResponse = await resend.emails.send({
+          from: 'onboarding@resend.dev',
+          to: [email],
+          subject: 'Your Daily Learning Questions',
+          html: emailHtml,
+          text: 'This email contains your daily learning questions. Please view in an HTML-capable email client.',
+        });
+
+        if (fallbackResponse.error) {
+          throw fallbackResponse.error;
+        }
+
+        log(`Email sent successfully with fallback domain! Message ID: ${fallbackResponse.data?.id}`);
+        return;
+      }
       throw error;
     }
 
