@@ -10,7 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Loader2, LogOut } from "lucide-react";
+import { Loader2, LogOut, CreditCard, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
@@ -92,19 +92,48 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {!user?.isSubscribed && isTrialActive && (
+        {/* Subscription Status */}
+        {user?.isSubscribed ? (
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center">
+                <Sparkles className="h-5 w-5 text-green-600 mr-2" />
+                <p className="text-green-800">
+                  Active Subscription - Enjoy unlimited access to all learning materials!
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : isTrialActive ? (
           <Card className="border-orange-200 bg-orange-50">
-            <CardContent className="p-4">
+            <CardContent className="p-4 flex items-center justify-between">
               <p className="text-orange-800">
-                Trial period active - ends on {trialEndsDate}. 
-                <Button 
-                  variant="link" 
-                  className="text-orange-800 underline p-0 ml-2"
-                  onClick={() => setLocation("/subscribe")}
-                >
-                  Subscribe now
-                </Button>
+                Trial period active - ends on {trialEndsDate}
               </p>
+              <Button 
+                variant="default"
+                onClick={() => setLocation("/subscribe")}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                <CreditCard className="mr-2 h-4 w-4" />
+                Subscribe Now
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4 flex items-center justify-between">
+              <p className="text-red-800">
+                Trial period has ended. Subscribe to continue learning.
+              </p>
+              <Button 
+                variant="default"
+                onClick={() => setLocation("/subscribe")}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <CreditCard className="mr-2 h-4 w-4" />
+                Subscribe Now
+              </Button>
             </CardContent>
           </Card>
         )}
