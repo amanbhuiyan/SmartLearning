@@ -18,7 +18,7 @@ import { format } from "date-fns";
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
 
   const { data: profile, isLoading: isLoadingProfile } = useQuery<StudentProfile>({
     queryKey: ["/api/profile"],
@@ -44,7 +44,11 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     await logoutMutation.mutateAsync();
-    setLocation("/auth");
+    navigate("/auth");
+  };
+
+  const handleSubscribe = () => {
+    navigate("/subscribe");
   };
 
   if (isLoadingProfile || isLoadingQuestions) {
@@ -77,7 +81,7 @@ export default function Dashboard() {
   const today = format(new Date(), "EEEE, MMMM do");
   const isTrialActive = user?.trialEndsAt && new Date(user.trialEndsAt) > new Date();
   const trialEndsDate = user?.trialEndsAt ? format(new Date(user.trialEndsAt), "MMMM do") : null;
-  const hasActiveSubscription = user?.subscriptionStatus === 'active'; // Added to check for active subscription
+  const hasActiveSubscription = user?.isSubscribed;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
@@ -98,7 +102,7 @@ export default function Dashboard() {
           <Card className="border-green-200 bg-green-50">
             <CardContent className="p-4 flex items-center justify-between">
               <div className="flex items-center">
-                <CreditCard className="h-5 w-5 text-green-600 mr-2" /> {/* Replaced Sparkles with CreditCard */}
+                <CreditCard className="h-5 w-5 text-green-600 mr-2" />
                 <p className="text-green-800">
                   Active Subscription - Enjoy unlimited access to all learning materials!
                 </p>
@@ -113,7 +117,7 @@ export default function Dashboard() {
               </p>
               <Button 
                 variant="default"
-                onClick={() => setLocation("/subscribe")}
+                onClick={handleSubscribe}
                 className="bg-orange-600 hover:bg-orange-700"
               >
                 <CreditCard className="mr-2 h-4 w-4" />
@@ -129,7 +133,7 @@ export default function Dashboard() {
               </p>
               <Button 
                 variant="default"
-                onClick={() => setLocation("/subscribe")}
+                onClick={handleSubscribe}
                 className="bg-red-600 hover:bg-red-700"
               >
                 <CreditCard className="mr-2 h-4 w-4" />
@@ -144,7 +148,6 @@ export default function Dashboard() {
             <CardTitle>Year {profile.grade} - Daily Questions</CardTitle>
             <CardDescription>
               Today's learning questions for {subjectsDisplay}. Click on each question to see the answer and explanation.
-              These questions have also been sent to your email address.
             </CardDescription>
           </CardHeader>
           <CardContent>
