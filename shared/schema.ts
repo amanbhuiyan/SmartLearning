@@ -4,8 +4,10 @@ import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   isSubscribed: boolean("is_subscribed").default(false),
@@ -29,9 +31,18 @@ export const questions = pgTable("questions", {
   explanation: text("explanation"),
 });
 
+// Schema for registration
 export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
+  email: true,
   password: true,
+  firstName: true,
+  lastName: true,
+});
+
+// Schema for login
+export const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 export const insertProfileSchema = createInsertSchema(studentProfiles).pick({
@@ -40,6 +51,7 @@ export const insertProfileSchema = createInsertSchema(studentProfiles).pick({
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type LoginData = z.infer<typeof loginSchema>;
 export type User = typeof users.$inferSelect;
 export type StudentProfile = typeof studentProfiles.$inferSelect;
 export type Question = typeof questions.$inferSelect;

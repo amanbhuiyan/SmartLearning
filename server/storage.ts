@@ -6,7 +6,7 @@ const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateStripeCustomerId(userId: number, customerId: string): Promise<User>;
   updateUserStripeInfo(userId: number, info: { customerId: string, subscriptionId: string }): Promise<User>;
@@ -37,9 +37,9 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  async getUserByEmail(email: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => user.email === email,
     );
   }
 
@@ -47,7 +47,7 @@ export class MemStorage implements IStorage {
     const id = this.currentId++;
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 7);
-    
+
     const user: User = { 
       ...insertUser, 
       id,
@@ -63,7 +63,7 @@ export class MemStorage implements IStorage {
   async updateStripeCustomerId(userId: number, customerId: string): Promise<User> {
     const user = await this.getUser(userId);
     if (!user) throw new Error("User not found");
-    
+
     const updated = { ...user, stripeCustomerId: customerId };
     this.users.set(userId, updated);
     return updated;
@@ -72,7 +72,7 @@ export class MemStorage implements IStorage {
   async updateUserStripeInfo(userId: number, info: { customerId: string, subscriptionId: string }): Promise<User> {
     const user = await this.getUser(userId);
     if (!user) throw new Error("User not found");
-    
+
     const updated = { 
       ...user, 
       stripeCustomerId: info.customerId,
@@ -103,7 +103,6 @@ export class MemStorage implements IStorage {
   }
 
   private generateSampleQuestions(): Question[] {
-    // Generate some sample questions for testing
     const questions: Question[] = [];
     const subjects = ['math', 'english'];
     const grades = [1, 2, 3, 4, 5, 6];
