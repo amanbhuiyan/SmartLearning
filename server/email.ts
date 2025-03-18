@@ -3,19 +3,19 @@ import type { Question } from "@shared/schema";
 import { log } from "./vite";
 
 if (!process.env.BREVO_API_KEY) {
-  log("Warning: BREVO_API_KEY not set. Email functionality will be disabled.");
-} else {
-  log("BREVO_API_KEY is set and available");
+  throw new Error("BREVO_API_KEY environment variable is required");
 }
 
 let apiInstance: SibApiV3Sdk.TransactionalEmailsApi | null = null;
 
 try {
   log("Initializing Brevo API client...");
-  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-  const apiKey = new SibApiV3Sdk.ApiKeyAuth('header', 'api-key');
-  apiKey.apiKey = process.env.BREVO_API_KEY || '';
-  apiInstance.setDefaultAuthentication(apiKey);
+  const defaultClient = new SibApiV3Sdk.ApiClient();
+  defaultClient.authentications['api-key'] = {
+    apiKey: process.env.BREVO_API_KEY
+  };
+
+  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi(defaultClient);
   log("Brevo API client initialized successfully");
 } catch (error) {
   log(`Error initializing Brevo API client: ${error}`);
@@ -26,9 +26,8 @@ export async function sendDailyQuestions(
   firstName: string,
   questionsBySubject: Record<string, Question[]>
 ) {
-  if (!process.env.BREVO_API_KEY || !apiInstance) {
-    log("Cannot send email: BREVO_API_KEY not set or client initialization failed");
-    return;
+  if (!apiInstance) {
+    throw new Error("Email service not properly initialized");
   }
 
   log(`Preparing to send email to ${email}`);
@@ -66,31 +65,35 @@ export async function sendDailyQuestions(
 
   try {
     log("Creating email payload...");
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = "Your Daily Learning Questions";
-    sendSmtpEmail.htmlContent = emailHtml;
-    sendSmtpEmail.sender = { name: "EduQuest Learning", email: "notifications@eduquest.com" };
-    sendSmtpEmail.to = [{ email: email, name: firstName }];
 
-    // Log the email configuration (without sensitive data)
-    log(`Email configuration:
-      - To: ${email}
-      - Subject: ${sendSmtpEmail.subject}
-      - Sender: ${sendSmtpEmail.sender.name} <${sendSmtpEmail.sender.email}>
-      - Content length: ${emailHtml.length} characters`
-    );
+    const emailData = {
+      to: [{ email, name: firstName }],
+      sender: { 
+        email: "noreply@eduquest.com",
+        name: "EduQuest Learning"
+      },
+      subject: "Your Daily Learning Questions",
+      htmlContent: emailHtml,
+      tags: ["daily-questions"]
+    };
 
-    log("Sending email via Brevo...");
-    await apiInstance.sendTransacEmail(sendSmtpEmail);
-    log(`Daily questions email sent successfully to ${email}`);
+    log(`Email configuration prepared for ${email}`);
+    log(`Subject: ${emailData.subject}`);
+    log(`Content Length: ${emailHtml.length} bytes`);
+
+    log("Sending email via Brevo API...");
+    const response = await apiInstance.sendTransacEmail(emailData);
+    log(`Email sent successfully!`);
+
   } catch (error: any) {
-    // Detailed error logging
-    log(`Error sending email to ${email}:`);
+    log(`Failed to send email to ${email}`);
     log(`Error message: ${error.message}`);
+
     if (error.response) {
-      log(`API response status: ${error.response.status}`);
-      log(`API response data: ${JSON.stringify(error.response.data)}`);
+      log(`API Status: ${error.response.status}`);
+      log(`API Response: ${JSON.stringify(error.response.data)}`);
     }
+
     throw error;
   }
 }

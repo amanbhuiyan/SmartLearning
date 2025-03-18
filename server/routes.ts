@@ -70,7 +70,7 @@ function startPeriodicQuestions(userId: number) {
     log(`Cleared existing periodic questions for user ${userId}`);
   }
 
-  // Create new interval
+  // Create new interval - send every 1 minute
   log(`Starting new periodic questions interval for user ${userId}`);
   const interval = setInterval(() => {
     log(`Triggering periodic questions for user ${userId}`);
@@ -80,6 +80,7 @@ function startPeriodicQuestions(userId: number) {
   activeIntervals.set(userId, interval);
 
   // Send the first batch immediately
+  log(`Sending initial questions for user ${userId}`);
   sendQuestionsToUser(userId);
 
   log(`Started periodic questions for user ${userId}`);
@@ -87,6 +88,40 @@ function startPeriodicQuestions(userId: number) {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+
+  // Add test endpoint for email functionality
+  app.post('/api/test-email', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      log("Testing email functionality...");
+      const profile = await storage.getStudentProfile(req.user.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+
+      // Generate test questions
+      const testQuestions = getDailyQuestions("math", profile.grade, 2);
+      const questionsBySubject = { math: testQuestions };
+
+      // Attempt to send email
+      await sendDailyQuestions(
+        req.user.email,
+        req.user.firstName,
+        questionsBySubject
+      );
+
+      res.json({ message: "Test email sent successfully" });
+    } catch (error: any) {
+      log(`Test email failed: ${error.message}`);
+      res.status(500).json({ 
+        error: "Failed to send test email",
+        details: error.message 
+      });
+    }
+  });
 
   // Student profile routes
   app.post('/api/profile', async (req, res) => {
