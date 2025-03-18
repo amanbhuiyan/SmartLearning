@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { runMigrations } from "./db";
+// import { runMigrations } from "./db";
 
 const app = express();
 app.use(express.json());
@@ -39,8 +39,8 @@ app.use((req, res, next) => {
 
 (async () => {
   try {
-    // Run database migrations before starting the server
-    await runMigrations();
+    // Temporarily comment out migrations
+    // await runMigrations();
 
     const server = await registerRoutes(app);
 
