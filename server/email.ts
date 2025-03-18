@@ -10,10 +10,10 @@ let apiInstance: SibApiV3Sdk.TransactionalEmailsApi | null = null;
 
 try {
   log("Initializing Brevo API client...");
-  const defaultClient = SibApiV3Sdk.ApiClient();
-  defaultClient.authentications['api-key'] = new SibApiV3Sdk.ApiKeyAuth('header', 'api-key');
-  defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
-  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi(defaultClient);
+  const apiKey = process.env.BREVO_API_KEY;
+  const defaultClient = SibApiV3Sdk.ApiClient.instance;
+  defaultClient.authentications['api-key'].apiKey = apiKey;
+  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
   log("Brevo API client initialized successfully");
 } catch (error) {
   log(`Error initializing Brevo API client: ${error}`);
@@ -64,24 +64,22 @@ export async function sendDailyQuestions(
   try {
     log("Creating email payload...");
 
-    const emailData = {
-      to: [{ email: email, name: firstName }],
-      sender: { 
-        email: "noreply@eduquest.com",
-        name: "EduQuest Learning"
-      },
-      subject: "Your Daily Learning Questions",
-      htmlContent: emailHtml,
-      tags: ["daily-questions"]
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.to = [{ email: email, name: firstName }];
+    sendSmtpEmail.sender = { 
+      email: "noreply@eduquest.com",
+      name: "EduQuest Learning"
     };
+    sendSmtpEmail.subject = "Your Daily Learning Questions";
+    sendSmtpEmail.htmlContent = emailHtml;
 
     log(`Email configuration prepared for ${email}`);
-    log(`Subject: ${emailData.subject}`);
+    log(`Subject: ${sendSmtpEmail.subject}`);
     log(`Content Length: ${emailHtml.length} bytes`);
 
     log("Sending email via Brevo API...");
-    const response = await apiInstance.sendTransacEmail(emailData);
-    log(`Email sent successfully! Response: ${JSON.stringify(response)}`);
+    const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    log(`Email sent successfully! Response data: ${JSON.stringify(data)}`);
 
   } catch (error: any) {
     log(`Failed to send email to ${email}`);
