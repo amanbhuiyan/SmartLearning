@@ -19,6 +19,9 @@ try {
   console.warn("Stripe integration disabled - missing configuration");
 }
 
+// Store active intervals by user ID
+const activeIntervals = new Map<number, NodeJS.Timeout>();
+
 // Function to send questions to a specific user
 async function sendQuestionsToUser(userId: number) {
   try {
@@ -53,6 +56,20 @@ async function sendQuestionsToUser(userId: number) {
   }
 }
 
+// Function to start periodic questions for a user
+function startPeriodicQuestions(userId: number) {
+  // Clear any existing interval
+  if (activeIntervals.has(userId)) {
+    clearInterval(activeIntervals.get(userId));
+    activeIntervals.delete(userId);
+  }
+
+  // Create new interval
+  const interval = setInterval(() => sendQuestionsToUser(userId), 60000); // Every minute
+  activeIntervals.set(userId, interval);
+  log(`Started periodic questions for user ${userId}`);
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
@@ -71,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Start sending periodic questions to this user
-      setInterval(() => sendQuestionsToUser(req.user.id), 60000); // Every minute
+      startPeriodicQuestions(req.user.id);
 
       res.json(profile);
     } catch (err) {
@@ -90,7 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     // Start sending periodic questions to this user
-    setInterval(() => sendQuestionsToUser(req.user.id), 60000); // Every minute
+    startPeriodicQuestions(req.user.id);
 
     res.json(profile);
   });
@@ -113,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      // Send email with the questions
+      // Send email with questions
       await sendDailyQuestions(
         req.user.email,
         req.user.firstName,
@@ -128,7 +145,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(questionsBySubject);
   });
 
-  // Subscription routes remain unchanged
   app.post('/api/get-or-create-subscription', async (req, res) => {
     if (!stripe) {
       return res.status(503).json({ 
@@ -173,11 +189,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.send({
         subscriptionId: subscription.id,
-        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret,
+        clientSecret: subscription.latest_invoice.payment_intent.client_secret,
       });
     } catch (error: any) {
       res.status(400).send({ error: { message: error.message } });
     }
+  });
+
+  // Cleanup intervals on logout
+  app.post("/api/logout", (req, res, next) => {
+    if (req.user?.id && activeIntervals.has(req.user.id)) {
+      clearInterval(activeIntervals.get(req.user.id));
+      activeIntervals.delete(req.user.id);
+      log(`Cleared periodic questions for user ${req.user.id}`);
+    }
+    req.logout((err) => {
+      if (err) return next(err);
+      res.sendStatus(200);
+    });
   });
 
   const httpServer = createServer(app);
