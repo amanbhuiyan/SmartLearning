@@ -33,39 +33,64 @@ export async function sendDailyQuestions(
 
   log(`Preparing to send email to ${email}`);
 
-  const formatQuestions = (questions: Question[]) => {
+  const formatQuestionsHtml = (questions: Question[]) => {
     return questions.map((q, index) => `
-      Question ${index + 1}: ${q.question}
-      Answer: ${q.answer}
-      ${q.explanation ? `Explanation: ${q.explanation}` : ''}
-      -------------------
+      <div style="margin-bottom: 20px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
+        <p><strong>Question ${index + 1}:</strong> ${q.question}</p>
+        <p><strong>Answer:</strong> ${q.answer}</p>
+        ${q.explanation ? `<p><strong>Explanation:</strong> ${q.explanation}</p>` : ''}
+      </div>
     `).join('\n');
   };
 
-  let emailContent = `Hello ${firstName}!\n\nHere are your daily learning questions:\n\n`;
+  let emailHtml = `
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>Hello ${firstName}!</h2>
+        <p>Here are your daily learning questions:</p>
+  `;
 
   Object.entries(questionsBySubject).forEach(([subject, questions]) => {
     log(`Processing ${questions.length} questions for subject: ${subject}`);
-    emailContent += `\n${subject.toUpperCase()}\n`;
-    emailContent += formatQuestions(questions);
-    emailContent += '\n';
+    emailHtml += `
+      <h3 style="color: #2563eb; margin-top: 20px;">${subject.toUpperCase()}</h3>
+      ${formatQuestionsHtml(questions)}
+    `;
   });
 
-  emailContent += '\nGood luck with your learning journey!\n';
+  emailHtml += `
+        <p style="margin-top: 20px;">Good luck with your learning journey!</p>
+      </body>
+    </html>
+  `;
 
   try {
     log("Creating email payload...");
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.subject = "Your Daily Learning Questions";
-    sendSmtpEmail.htmlContent = emailContent.replace(/\n/g, '<br>');
-    sendSmtpEmail.sender = { name: "EduQuest", email: "noreply@eduquest.com" };
+    sendSmtpEmail.htmlContent = emailHtml;
+    sendSmtpEmail.sender = { name: "EduQuest Learning", email: "notifications@eduquest.com" };
     sendSmtpEmail.to = [{ email: email, name: firstName }];
+
+    // Log the email configuration (without sensitive data)
+    log(`Email configuration:
+      - To: ${email}
+      - Subject: ${sendSmtpEmail.subject}
+      - Sender: ${sendSmtpEmail.sender.name} <${sendSmtpEmail.sender.email}>
+      - Content length: ${emailHtml.length} characters`
+    );
 
     log("Sending email via Brevo...");
     await apiInstance.sendTransacEmail(sendSmtpEmail);
     log(`Daily questions email sent successfully to ${email}`);
-  } catch (error) {
-    log(`Error sending email to ${email}: ${error}`);
+  } catch (error: any) {
+    // Detailed error logging
+    log(`Error sending email to ${email}:`);
+    log(`Error message: ${error.message}`);
+    if (error.response) {
+      log(`API response status: ${error.response.status}`);
+      log(`API response data: ${JSON.stringify(error.response.data)}`);
+    }
     throw error;
   }
 }
