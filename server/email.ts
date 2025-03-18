@@ -1,42 +1,18 @@
-import SibApiV3Sdk from '@sendinblue/client';
+import { Resend } from 'resend';
 import type { Question } from "@shared/schema";
 import { log } from "./vite";
 
-if (!process.env.BREVO_API_KEY) {
-  throw new Error("BREVO_API_KEY environment variable is required");
+if (!process.env.RESEND_API_KEY) {
+  throw new Error("RESEND_API_KEY environment variable is required");
 }
 
-let apiInstance: SibApiV3Sdk.TransactionalEmailsApi | null = null;
-
-try {
-  log("Initializing Brevo API client...");
-  // Create API instance first
-  const defaultClient = new SibApiV3Sdk.ApiClient();
-
-  // Configure API key authorization
-  const apiKey = defaultClient.authentications['api-key'];
-  if (apiKey) {
-    apiKey.apiKey = process.env.BREVO_API_KEY;
-    log(`API Key configured successfully (length: ${process.env.BREVO_API_KEY.length})`);
-  } else {
-    throw new Error('API key authentication not properly configured');
-  }
-
-  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi(defaultClient);
-  log("Brevo API client initialized successfully");
-} catch (error) {
-  log(`Error initializing Brevo API client: ${error}`);
-}
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendDailyQuestions(
   email: string, 
   firstName: string,
   questionsBySubject: Record<string, Question[]>
 ) {
-  if (!apiInstance) {
-    throw new Error("Email service not properly initialized");
-  }
-
   log(`Preparing to send email to ${email}`);
 
   const formatQuestionsHtml = (questions: Question[]) => {
@@ -53,6 +29,7 @@ export async function sendDailyQuestions(
     <html>
       <body style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Hello ${firstName}!</h2>
+        <p style="color: #2563eb; font-weight: bold;">This is a test email from EduQuest Learning Platform.</p>
         <p>Here are your daily learning questions:</p>
   `;
 
@@ -66,6 +43,9 @@ export async function sendDailyQuestions(
 
   emailHtml += `
         <p style="margin-top: 20px;">Good luck with your learning journey!</p>
+        <hr>
+        <p style="color: #666; font-size: 12px;">This is a test email sent on ${new Date().toLocaleString()}. 
+        If you received this email, it means our email system is working correctly.</p>
       </body>
     </html>
   `;
@@ -73,24 +53,26 @@ export async function sendDailyQuestions(
   try {
     log("Creating email payload...");
 
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail(); 
-    sendSmtpEmail.to = [{ email: email, name: firstName }];
-    sendSmtpEmail.sender = { 
-      email: "edu@eduquest.com",
-      name: "EduQuest Learning"
-    };
-    sendSmtpEmail.subject = "Your Daily Learning Questions";
-    sendSmtpEmail.htmlContent = emailHtml;
-
     // Log email configuration (without sensitive data)
     log(`Email configuration prepared:`);
     log(`To: ${email}`);
-    log(`From: ${sendSmtpEmail.sender.name} <${sendSmtpEmail.sender.email}>`);
     log(`Content Length: ${emailHtml.length} bytes`);
 
-    log("Sending email via Brevo API...");
-    const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    log(`Email sent successfully! Response: ${JSON.stringify(data)}`);
+    log("Sending email via Resend API...");
+    const { data, error } = await resend.emails.send({
+      from: 'onboarding@resend.dev',  // Using Resend's verified domain
+      to: [email],
+      subject: 'Your Daily Learning Questions',
+      html: emailHtml,
+      text: 'This email contains your daily learning questions. Please view in an HTML-capable email client.',
+    });
+
+    if (error) {
+      log(`Resend API Error: ${JSON.stringify(error)}`);
+      throw error;
+    }
+
+    log(`Email sent successfully! Message ID: ${data?.id}`);
 
   } catch (error: any) {
     log(`Failed to send email to ${email}`);

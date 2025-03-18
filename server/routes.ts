@@ -96,14 +96,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const testQuestions = getDailyQuestions("math", 5, 2);
       const questionsBySubject = { math: testQuestions };
 
-      // Attempt to send email
+      // Attempt to send email with clear test subject
       await sendDailyQuestions(
-        "test@example.com",
-        "Test User",
+        "aub204@yahoo.com",  // Using the actual user email
+        "EduQuest User",     // More professional name
         questionsBySubject
       );
 
-      res.json({ message: "Test email sent successfully" });
+      res.json({ 
+        message: "Test email sent successfully",
+        sentTo: "aub204@yahoo.com",
+        emailType: "Daily Learning Questions"
+      });
     } catch (error: any) {
       log(`Test email failed: ${error.message}`);
       res.status(500).json({ 
