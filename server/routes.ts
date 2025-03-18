@@ -3,6 +3,9 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertProfileSchema } from "@shared/schema";
+import { getDailyQuestions } from "./questions";
+import { sendDailyQuestions } from "./email";
+import { log } from "./vite";
 
 let stripe: any;
 try {
@@ -60,16 +63,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    // Get 20 questions for each selected subject
-    const questionsBySubject = {};
+    // Generate new questions for each subject
+    const questionsBySubject: Record<string, any> = {};
     for (const subject of profile.subjects) {
-      const questions = await storage.getDailyQuestions(subject, profile.grade);
-      questionsBySubject[subject] = questions.slice(0, 20);
+      const questions = getDailyQuestions(subject, profile.grade, 20);
+      questionsBySubject[subject] = questions;
     }
 
-    // TODO: Send email with questions
-    // We'll need to set up SendGrid to implement this
-    // For now, just return the questions grouped by subject
+    try {
+      // Send email with the questions
+      await sendDailyQuestions(
+        req.user.email,
+        req.user.firstName,
+        questionsBySubject
+      );
+      log(`Questions email sent to ${req.user.email}`);
+    } catch (error) {
+      log(`Failed to send questions email: ${error}`);
+      // Continue even if email fails - don't block the API response
+    }
+
     res.json(questionsBySubject);
   });
 
