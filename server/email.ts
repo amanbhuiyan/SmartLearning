@@ -27,25 +27,40 @@ export async function sendDailyQuestions(
 
   let emailHtml = `
     <html>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>Hello ${firstName}!</h2>
-        <p style="color: #2563eb; font-weight: bold;">Welcome to your daily EduQuest learning questions!</p>
-        <p>Here are your personalized questions for today:</p>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+          <h2 style="color: #1a1a1a; margin: 0;">Daily Questions for ${firstName}</h2>
+          <p style="color: #4B5563; margin: 8px 0 0 0;">${new Date().toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}</p>
+        </div>
   `;
 
   Object.entries(questionsBySubject).forEach(([subject, questions]) => {
     log(`Processing ${questions.length} questions for subject: ${subject}`);
     emailHtml += `
-      <h3 style="color: #2563eb; margin-top: 20px;">${subject.toUpperCase()}</h3>
-      ${formatQuestionsHtml(questions)}
+      <div style="margin-top: 30px;">
+        <h3 style="color: #2563eb; padding-bottom: 10px; border-bottom: 2px solid #e5e7eb;">
+          ${subject.charAt(0).toUpperCase() + subject.slice(1)}
+        </h3>
+        ${formatQuestionsHtml(questions)}
+      </div>
     `;
   });
 
   emailHtml += `
-        <p style="margin-top: 20px;">Keep learning and growing!</p>
-        <p style="margin-top: 10px; color: #4B5563;">Best regards,<br>The EduQuest Team</p>
-        <hr>
-        <p style="color: #666; font-size: 12px;">Sent via EduQuest Learning Platform on ${new Date().toLocaleString()}</p>
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+          <p style="color: #4B5563;">Keep learning and growing!</p>
+          <p style="color: #4B5563; margin-bottom: 0;">Best regards,<br>The EduQuest Team</p>
+        </div>
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+          <p style="color: #6B7280; font-size: 12px;">
+            Sent via EduQuest Learning Platform
+          </p>
+        </div>
       </body>
     </html>
   `;

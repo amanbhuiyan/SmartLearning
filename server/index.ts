@@ -69,10 +69,10 @@ async function sendDailyQuestionsToAllUsers() {
           questionsBySubject[subjectRecord.subject] = questions;
         }
 
-        // Send email to the user
+        // Send email to the user with child's name
         await sendDailyQuestions(
           user.email,
-          user.first_name,
+          userSubjects[0].childName, // Using child's name instead of user's first name
           questionsBySubject
         );
 
