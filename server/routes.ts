@@ -95,12 +95,8 @@ function startGlobalEmailInterval() {
     log('Cleared existing global email interval');
   }
 
-  log('Starting new global email interval');
+  log('Starting new global email interval - emails will be sent every 5 minutes');
   globalEmailInterval = setInterval(sendQuestionsToAllEligibleUsers, 5 * 60 * 1000);
-
-  // Start first batch after 1 minute
-  setTimeout(sendQuestionsToAllEligibleUsers, 60 * 1000);
-  log('Global email interval set up. First batch will be sent in 1 minute, then every 5 minutes.');
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
