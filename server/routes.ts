@@ -305,26 +305,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const questionsBySubject: Record<string, Question[]> = {};
       let hasValidQuestions = true;
 
+      // Validate subject access
       for (const subject of profile.subjects) {
         const questions = await getDailyQuestions(subject, profile.grade, 20);
 
-        // Validate if we have enough questions for this grade and subject
+        // Strict validation: ensure we have questions and they match the exact grade level
         if (questions.length === 0) {
           log(`Error: No questions found for subject ${subject}, grade ${profile.grade}`);
           hasValidQuestions = false;
           break;
         }
 
-        questionsBySubject[subject] = questions;
-        log(`Generated ${questions.length} questions for ${subject} (Grade ${profile.grade})`);
+        // Additional validation to ensure grade level match
+        const validGradeQuestions = questions.filter(q => q.grade === profile.grade);
+        if (validGradeQuestions.length === 0) {
+          log(`Error: No questions found for exact grade ${profile.grade} in subject ${subject}`);
+          hasValidQuestions = false;
+          break;
+        }
+
+        questionsBySubject[subject] = validGradeQuestions;
+        log(`Generated ${validGradeQuestions.length} questions for ${subject} (Grade ${profile.grade})`);
       }
 
       if (!hasValidQuestions) {
         return res.status(404).json({ 
-          error: "No questions available for some subjects at your grade level" 
+          error: "No questions available for your selected grade level and subjects" 
         });
       }
 
+      // Only try to send email if we have valid questions
       try {
         await sendDailyQuestions(
           req.user.email,
@@ -343,7 +353,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Cleanup intervals on logout
   app.post("/api/logout", (req, res, next) => {
     if (req.user?.id && activeIntervals.has(req.user.id)) {
       clearInterval(activeIntervals.get(req.user.id));

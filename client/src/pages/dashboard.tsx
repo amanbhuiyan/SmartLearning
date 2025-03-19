@@ -27,6 +27,13 @@ export default function Dashboard() {
   const { data: questionsBySubject, isLoading: isLoadingQuestions } = useQuery<Record<string, Question[]>>({
     queryKey: ["/api/questions"],
     enabled: !!profile, // Only fetch questions if profile exists
+    onError: (error: any) => {
+      toast({
+        title: "Error loading questions",
+        description: error.response?.data?.error || "Failed to load your daily questions",
+        variant: "destructive",
+      });
+    }
   });
 
   const handleLogout = async () => {
@@ -48,7 +55,7 @@ export default function Dashboard() {
 
   // Redirect to profile setup if no profile exists
   if (!profile) {
-    navigate("/setup-profile");
+    navigate("/");
     return null;
   }
 
