@@ -22,11 +22,99 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 // Store active intervals by user ID
 const activeIntervals = new Map<number, NodeJS.Timeout>();
 
-// Flag to track if we're currently processing emails
-let isProcessingEmails = false;
+// Email Queue Implementation
+class EmailQueue {
+  private queue: number[] = [];  // Store user IDs
+  private isProcessing = false;
 
-// Initialize global email interval
-let globalEmailInterval: NodeJS.Timeout | null = null;
+  // Add a user to the queue
+  enqueue(userId: number) {
+    if (!this.queue.includes(userId)) {
+      log(`Adding user ${userId} to email queue`);
+      this.queue.push(userId);
+      this.startProcessing();
+    }
+  }
+
+  // Start processing the queue if not already processing
+  private startProcessing() {
+    if (!this.isProcessing && this.queue.length > 0) {
+      log('Starting queue processing');
+      this.isProcessing = true;
+      this.processNextInQueue();
+    }
+  }
+
+  // Process the next user in the queue with a 30-second delay
+  private async processNextInQueue() {
+    if (this.queue.length === 0) {
+      log('Queue processing complete - no more users in queue');
+      this.isProcessing = false;
+      return;
+    }
+
+    const userId = this.queue.shift();
+    if (!userId) {
+      this.isProcessing = false;
+      return;
+    }
+
+    try {
+      log(`Processing emails for user ${userId}`);
+      const user = await db.select().from(users).where(eq(users.id, userId)).then(rows => rows[0]);
+
+      if (!user) {
+        log(`User ${userId} not found - skipping`);
+        setTimeout(() => this.processNextInQueue(), 30000); // Wait 30 seconds before next user
+        return;
+      }
+
+      const isInTrialPeriod = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
+      const isSubscribed = user.isSubscribed && user.stripeSubscriptionId;
+
+      if (isInTrialPeriod || isSubscribed) {
+        const profile = await storage.getStudentProfile(user.id);
+
+        if (profile) {
+          log(`Processing eligible user ${user.id} (${user.email}) with profile`);
+
+          // Generate questions for each subject
+          const questionsBySubject: Record<string, Question[]> = {};
+          for (const subject of profile.subjects) {
+            const questions = getDailyQuestions(subject, profile.grade, 20);
+            questionsBySubject[subject] = questions;
+            log(`Generated ${questions.length} questions for ${subject}`);
+          }
+
+          // Send email
+          try {
+            await sendDailyQuestions(
+              user.email,
+              user.firstName,
+              questionsBySubject
+            );
+            log(`Successfully sent questions email to ${user.email}`);
+          } catch (error) {
+            log(`Failed to send email to ${user.email}: ${error}`);
+          }
+        } else {
+          log(`Eligible user ${user.id} has no profile yet`);
+        }
+      } else {
+        log(`User ${user.id} (${user.email}) is not eligible for emails`);
+      }
+    } catch (err) {
+      log(`Error processing user ${userId}: ${err}`);
+    }
+
+    // Schedule processing of next user after 30 seconds
+    log(`Waiting 30 seconds before processing next user in queue`);
+    setTimeout(() => this.processNextInQueue(), 30000);
+  }
+}
+
+// Create a single instance of EmailQueue
+const emailQueue = new EmailQueue();
 
 // Function to send questions to all eligible users
 async function sendQuestionsToAllEligibleUsers() {
@@ -38,67 +126,29 @@ async function sendQuestionsToAllEligibleUsers() {
 
   try {
     isProcessingEmails = true;
-    log('Starting to send questions to all eligible users');
+    log('Starting to add eligible users to email queue');
 
     // Get all users from the database
     const results = await db.select().from(users);
-    let emailsSent = 0;
 
     for (const user of results) {
-      try {
-        log(`User ${user.id} (${user.email}) eligibility check:
-          Trial ends: ${user.trialEndsAt}
-          Is subscribed: ${user.isSubscribed}
-          Has subscription ID: ${!!user.stripeSubscriptionId}
-        `);
-
-        const isInTrialPeriod = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
-        const isSubscribed = user.isSubscribed && user.stripeSubscriptionId;
-
-        if (isInTrialPeriod || isSubscribed) {
-          const profile = await storage.getStudentProfile(user.id);
-
-          if (profile) {
-            log(`Processing eligible user ${user.id} (${user.email}) with profile`);
-
-            // Generate questions for each subject
-            const questionsBySubject: Record<string, Question[]> = {};
-            for (const subject of profile.subjects) {
-              const questions = getDailyQuestions(subject, profile.grade, 20);
-              questionsBySubject[subject] = questions;
-              log(`Generated ${questions.length} questions for ${subject}`);
-            }
-
-            // Send email
-            try {
-              await sendDailyQuestions(
-                user.email,
-                user.firstName,
-                questionsBySubject
-              );
-              emailsSent++;
-              log(`Successfully sent questions email to ${user.email} (Total sent: ${emailsSent})`);
-            } catch (error) {
-              log(`Failed to send email to ${user.email}: ${error}`);
-            }
-          } else {
-            log(`Eligible user ${user.id} has no profile yet`);
-          }
-        } else {
-          log(`User ${user.id} (${user.email}) is not eligible for emails`);
-        }
-      } catch (err) {
-        log(`Error processing user ${user.id}: ${err}`);
-      }
+      log(`Adding user ${user.id} (${user.email}) to queue`);
+      emailQueue.enqueue(user.id);
     }
 
-    log(`Email sending batch completed. Total emails sent: ${emailsSent}`);
+    log(`Added ${results.length} users to email queue`);
   } catch (err) {
     log(`Error in sendQuestionsToAllEligibleUsers: ${err}`);
   } finally {
     isProcessingEmails = false;
   }
 }
+
+// Flag to track if we're currently processing emails
+let isProcessingEmails = false;
+
+// Initialize global email interval
+let globalEmailInterval: NodeJS.Timeout | null = null;
 
 // Function to start global email interval
 function startGlobalEmailInterval() {
