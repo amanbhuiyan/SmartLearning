@@ -69,23 +69,9 @@ export async function sendDailyQuestions(
 
     if (error) {
       log(`Resend API Error: ${JSON.stringify(error)}`);
-      // If domain verification error, attempt one more time...
       if (error.statusCode === 403 && error.message?.includes('domain is not verified')) {
-        log('Retrying with same domain...');
-        const retryResponse = await resend.emails.send({
-          from: 'EduQuest <info@asn-global.co.uk>',  // Using verified domain for retry
-          to: [email],
-          subject: 'Your Daily Learning Questions',
-          html: emailHtml,
-          text: 'This email contains your daily learning questions. Please view in an HTML-capable email client.',
-        });
-
-        if (retryResponse.error) {
-          throw retryResponse.error;
-        }
-
-        log(`Email sent successfully with retry! Message ID: ${retryResponse.data?.id}`);
-        return;
+        log('Domain verification error - Please ensure asn-global.co.uk is verified in the Resend dashboard');
+        throw new Error('Email domain is not yet verified. Please wait for domain verification to complete.');
       }
       throw error;
     }
