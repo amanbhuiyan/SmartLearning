@@ -39,9 +39,9 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user) {
-      // If user has no profile, redirect to setup
+      // If user has no profile, redirect to home for setup
       if (!profile) {
-        setLocation("/setup-profile");
+        setLocation("/");
         return;
       }
       // If user has profile, go to dashboard

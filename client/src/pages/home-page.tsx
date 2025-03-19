@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
+import type { z } from "zod";
 
 const subjects = [
   { id: "math", label: "Mathematics" },
@@ -38,7 +39,7 @@ export default function HomePage() {
     queryKey: ["/api/profile"],
   });
 
-  const form = useForm({
+  const form = useForm<z.infer<typeof insertProfileSchema>>({
     resolver: zodResolver(insertProfileSchema),
     defaultValues: {
       subjects: [],
@@ -46,7 +47,7 @@ export default function HomePage() {
     },
   });
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: z.infer<typeof insertProfileSchema>) => {
     await apiRequest("POST", "/api/profile", data);
     setLocation("/dashboard");
   };
@@ -125,7 +126,7 @@ export default function HomePage() {
                                     checked={field.value?.includes(subject.id)}
                                     onCheckedChange={(checked) => {
                                       return checked
-                                        ? field.onChange([...field.value, subject.id])
+                                        ? field.onChange([...(field.value || []), subject.id])
                                         : field.onChange(
                                             field.value?.filter(
                                               (value) => value !== subject.id
