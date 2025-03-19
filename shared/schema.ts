@@ -16,8 +16,11 @@ export const users = pgTable("users", {
 
 export const studentProfiles = pgTable("student_profiles", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id),
-  subjects: text("subjects").array().notNull(), // ['math', 'english']
+  userId: integer("user_id")
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull()
+    .unique(), // Ensure one-to-one relationship
+  subjects: text("subjects").array().notNull(),
   grade: integer("grade").notNull(),
   lastQuestionDate: date("last_question_date"),
 });
