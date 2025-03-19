@@ -170,7 +170,7 @@ export default function AuthPage() {
                     <Form {...loginForm}>
                       <form
                         onSubmit={loginForm.handleSubmit(
-                          data => loginMutation.mutateAsync(data).catch(handleLoginError)
+                          data => loginMutation.mutateAsync({ email: data.email, password: data.password }).catch(handleLoginError)
                         )}
                         className="space-y-4"
                       >

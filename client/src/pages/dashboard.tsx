@@ -61,7 +61,7 @@ export default function Dashboard() {
     );
   }
 
-  const subjectsDisplay = profile.subjects.map(s => 
+  const subjectsDisplay = profile.subjects.map(s =>
     s.charAt(0).toUpperCase() + s.slice(1)
   ).join(", ");
 
@@ -102,7 +102,7 @@ export default function Dashboard() {
               <p className="text-yellow-800">
                 Subscription payment pending. Please complete your payment to access all features.
               </p>
-              <Button 
+              <Button
                 variant="default"
                 onClick={handleSubscribe}
                 className="bg-yellow-600 hover:bg-yellow-700"
@@ -118,7 +118,7 @@ export default function Dashboard() {
               <p className="text-orange-800">
                 Trial period active - ends on {trialEndsDate}
               </p>
-              <Button 
+              <Button
                 variant="default"
                 onClick={handleSubscribe}
                 className="bg-orange-600 hover:bg-orange-700"
@@ -134,7 +134,7 @@ export default function Dashboard() {
               <p className="text-red-800">
                 Trial period has ended. Subscribe to continue learning.
               </p>
-              <Button 
+              <Button
                 variant="default"
                 onClick={handleSubscribe}
                 className="bg-red-600 hover:bg-red-700"
@@ -154,7 +154,7 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {Object.entries(questionsBySubject).map(([subject, questions]) => (
+            {questionsBySubject && Object.entries(questionsBySubject).map(([subject, questions]) => (
               <div key={subject} className="mb-8 last:mb-0">
                 <h2 className="text-xl font-semibold mb-4 text-primary">
                   {subject.charAt(0).toUpperCase() + subject.slice(1)}
