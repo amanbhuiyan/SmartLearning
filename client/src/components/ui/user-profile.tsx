@@ -28,12 +28,13 @@ export function UserProfileDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-          <Avatar className="h-10 w-10">
+        <Button variant="ghost" className="relative h-10 min-w-[200px] flex items-center justify-start gap-2 px-2">
+          <Avatar className="h-8 w-8">
             <AvatarFallback className="text-xs">
               {`${user.firstName[0]}${user.lastName[0]}`}
             </AvatarFallback>
           </Avatar>
+          <span className="text-sm font-medium">{fullName}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end">
