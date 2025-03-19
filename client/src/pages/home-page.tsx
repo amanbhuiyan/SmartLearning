@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { insertProfileSchema } from "@shared/schema";
+import { queryClient } from "@/lib/queryClient";
 import {
   Form,
   FormControl,
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 import type { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
 
 const subjects = [
   { id: "math", label: "Mathematics" },
@@ -34,9 +36,11 @@ const subjects = [
 export default function HomePage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: isLoadingProfile } = useQuery({
     queryKey: ["/api/profile"],
+    enabled: !!user, // Only fetch profile if user exists
   });
 
   const form = useForm<z.infer<typeof insertProfileSchema>>({
@@ -48,8 +52,18 @@ export default function HomePage() {
   });
 
   const onSubmit = async (data: z.infer<typeof insertProfileSchema>) => {
-    await apiRequest("POST", "/api/profile", data);
-    setLocation("/dashboard");
+    try {
+      await apiRequest("POST", "/api/profile", data);
+      // Invalidate the profile query to trigger a refetch
+      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      setLocation("/dashboard");
+    } catch (error: any) {
+      toast({
+        title: "Error creating profile",
+        description: error.response?.data?.error || "Failed to create profile",
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
@@ -60,6 +74,14 @@ export default function HomePage() {
       setLocation("/subscribe");
     }
   }, [profile, user, setLocation]);
+
+  if (isLoadingProfile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
