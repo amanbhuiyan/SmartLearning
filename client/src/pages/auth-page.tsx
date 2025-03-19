@@ -6,6 +6,7 @@ import { z } from "zod";
 import { insertUserSchema, loginSchema } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { HeroIllustration } from "@/components/ui/hero-illustration";
 import {
   Form,
   FormControl,
@@ -91,6 +92,11 @@ export default function AuthPage() {
               </p>
             </div>
 
+            {/* Hero Illustration */}
+            <div className="hidden lg:block">
+              <HeroIllustration />
+            </div>
+
             {/* Feature List */}
             <div className="grid gap-6">
               <div className="flex items-start gap-4">
@@ -149,10 +155,10 @@ export default function AuthPage() {
                   </TabsList>
                   <TabsContent value="login">
                     <Form {...loginForm}>
-                      <form 
+                      <form
                         onSubmit={loginForm.handleSubmit(
                           data => loginMutation.mutateAsync(data).catch(handleLoginError)
-                        )} 
+                        )}
                         className="space-y-4"
                       >
                         <FormField
@@ -181,8 +187,8 @@ export default function AuthPage() {
                             </FormItem>
                           )}
                         />
-                        <Button 
-                          type="submit" 
+                        <Button
+                          type="submit"
                           className="w-full"
                           disabled={loginMutation.isPending}
                         >
@@ -193,10 +199,10 @@ export default function AuthPage() {
                   </TabsContent>
                   <TabsContent value="register">
                     <Form {...registerForm}>
-                      <form 
+                      <form
                         onSubmit={registerForm.handleSubmit(
                           data => registerMutation.mutateAsync(data).catch(handleRegisterError)
-                        )} 
+                        )}
                         className="space-y-4"
                       >
                         <FormField
@@ -251,8 +257,8 @@ export default function AuthPage() {
                             </FormItem>
                           )}
                         />
-                        <Button 
-                          type="submit" 
+                        <Button
+                          type="submit"
                           className="w-full"
                           disabled={registerMutation.isPending}
                         >
