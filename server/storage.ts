@@ -41,7 +41,7 @@ export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
     try {
       log(`Getting user by id: ${id}`);
-      const results = await db.select().from(users).where(eq(users.id, id));
+      const results = await db.select().from(users).where(eq(users.user_id, id));
       log(`Found user: ${results[0] ? 'yes' : 'no'}`);
       return results[0];
     } catch (error) {
@@ -89,7 +89,7 @@ export class DatabaseStorage implements IStorage {
       const results = await db
         .select()
         .from(studentSubjects)
-        .where(eq(studentSubjects.userId, userId));
+        .where(eq(studentSubjects.user_id, userId));
       return results;
     } catch (error) {
       log(`Error getting user subjects: ${error instanceof Error ? error.message : String(error)}`);
@@ -100,7 +100,7 @@ export class DatabaseStorage implements IStorage {
   async createUserSubjects(userId: number, subjects: string[], grade: number): Promise<StudentSubject[]> {
     try {
       const subjectEntries = subjects.map(subject => ({
-        userId,
+        user_id: userId,
         subject,
         grade,
         lastQuestionDate: new Date().toISOString(),
@@ -140,7 +140,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db
         .update(users)
         .set({ stripeCustomerId: customerId })
-        .where(eq(users.id, userId))
+        .where(eq(users.user_id, userId))
         .returning();
       return result[0];
     } catch (error) {
@@ -158,7 +158,7 @@ export class DatabaseStorage implements IStorage {
           stripeSubscriptionId: info.subscriptionId,
           isSubscribed: true,
         })
-        .where(eq(users.id, userId))
+        .where(eq(users.user_id, userId))
         .returning();
       return result[0];
     } catch (error) {
@@ -185,7 +185,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db
         .update(users)
         .set({ isSubscribed })
-        .where(eq(users.id, userId))
+        .where(eq(users.user_id, userId))
         .returning();
       return result[0];
     } catch (error) {
