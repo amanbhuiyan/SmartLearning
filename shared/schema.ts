@@ -14,13 +14,13 @@ export const users = pgTable("users", {
   trialEndsAt: date("trial_ends_at"),
 });
 
-export const studentProfiles = pgTable("student_profiles", {
+// Each student can have multiple subjects
+export const studentSubjects = pgTable("student_subjects", {
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .references(() => users.id, { onDelete: 'cascade' })
-    .notNull()
-    .unique(), // Ensure one-to-one relationship
-  subjects: text("subjects").array().notNull(),
+    .notNull(),
+  subject: text("subject").notNull(),
   grade: integer("grade").notNull(),
   lastQuestionDate: date("last_question_date"),
 });
@@ -57,5 +57,5 @@ export const insertProfileSchema = z.object({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
 export type User = typeof users.$inferSelect;
-export type StudentProfile = typeof studentProfiles.$inferSelect;
+export type StudentSubject = typeof studentSubjects.$inferSelect;
 export type Question = typeof questions.$inferSelect;

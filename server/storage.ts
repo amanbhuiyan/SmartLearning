@@ -1,8 +1,8 @@
-import { User, StudentProfile, Question, InsertUser } from "@shared/schema";
+import { User, StudentSubject, Question, InsertUser } from "@shared/schema";
 import session from "express-session";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
-import { users, studentProfiles, questions } from "@shared/schema";
+import { users, studentSubjects, questions } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import { log } from "./vite";
 
@@ -14,8 +14,8 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateStripeCustomerId(userId: number, customerId: string): Promise<User>;
   updateUserStripeInfo(userId: number, info: { customerId: string, subscriptionId: string }): Promise<User>;
-  getStudentProfile(userId: number): Promise<StudentProfile | undefined>;
-  createStudentProfile(profile: Omit<StudentProfile, "id">): Promise<StudentProfile>;
+  getUserSubjects(userId: number): Promise<StudentSubject[]>;
+  createUserSubjects(userId: number, subjects: string[], grade: number): Promise<StudentSubject[]>;
   getDailyQuestions(subject: string, grade: number): Promise<Question[]>;
   sessionStore: session.Store;
   getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
@@ -44,9 +44,9 @@ export class DatabaseStorage implements IStorage {
       const results = await db.select().from(users).where(eq(users.id, id));
       log(`Found user: ${results[0] ? 'yes' : 'no'}`);
       return results[0];
-    } catch (err) {
-      log(`Error getting user by id: ${err.message}`);
-      throw err;
+    } catch (error) {
+      log(`Error getting user by id: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
@@ -56,9 +56,9 @@ export class DatabaseStorage implements IStorage {
       const results = await db.select().from(users).where(eq(users.email, email));
       log(`Found user by email: ${results[0] ? 'yes' : 'no'}`);
       return results[0];
-    } catch (err) {
-      log(`Error getting user by email: ${err.message}`);
-      throw err;
+    } catch (error) {
+      log(`Error getting user by email: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
@@ -78,9 +78,60 @@ export class DatabaseStorage implements IStorage {
 
       log(`User created successfully: ${JSON.stringify(result[0])}`);
       return result[0];
-    } catch (err) {
-      log(`Error creating user: ${err.message}`);
-      throw err;
+    } catch (error) {
+      log(`Error creating user: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+
+  async getUserSubjects(userId: number): Promise<StudentSubject[]> {
+    try {
+      const results = await db
+        .select()
+        .from(studentSubjects)
+        .where(eq(studentSubjects.userId, userId));
+      return results;
+    } catch (error) {
+      log(`Error getting user subjects: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+
+  async createUserSubjects(userId: number, subjects: string[], grade: number): Promise<StudentSubject[]> {
+    try {
+      const subjectEntries = subjects.map(subject => ({
+        userId,
+        subject,
+        grade,
+        lastQuestionDate: new Date().toISOString(),
+      }));
+
+      const result = await db
+        .insert(studentSubjects)
+        .values(subjectEntries)
+        .returning();
+      return result;
+    } catch (error) {
+      log(`Error creating user subjects: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+
+  async getDailyQuestions(subject: string, grade: number): Promise<Question[]> {
+    try {
+      log(`Getting questions for subject: ${subject}, grade: ${grade}`);
+      const results = await db
+        .select()
+        .from(questions)
+        .where(eq(questions.subject, subject))
+        .where(eq(questions.grade, grade))
+        .limit(20);
+
+      log(`Found ${results.length} questions`);
+      return results;
+    } catch (error) {
+      log(`Error getting daily questions: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
@@ -92,9 +143,9 @@ export class DatabaseStorage implements IStorage {
         .where(eq(users.id, userId))
         .returning();
       return result[0];
-    } catch (err) {
-      log(`Error updating stripe customer id: ${err.message}`);
-      throw err;
+    } catch (error) {
+      log(`Error updating stripe customer id: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
@@ -110,54 +161,12 @@ export class DatabaseStorage implements IStorage {
         .where(eq(users.id, userId))
         .returning();
       return result[0];
-    } catch (err) {
-      log(`Error updating user stripe info: ${err.message}`);
-      throw err;
+    } catch (error) {
+      log(`Error updating user stripe info: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
-  async getStudentProfile(userId: number): Promise<StudentProfile | undefined> {
-    try {
-      const results = await db
-        .select()
-        .from(studentProfiles)
-        .where(eq(studentProfiles.userId, userId));
-      return results[0];
-    } catch (err) {
-      log(`Error getting student profile: ${err.message}`);
-      throw err;
-    }
-  }
-
-  async createStudentProfile(profile: Omit<StudentProfile, "id">): Promise<StudentProfile> {
-    try {
-      const result = await db
-        .insert(studentProfiles)
-        .values(profile)
-        .returning();
-      return result[0];
-    } catch (err) {
-      log(`Error creating student profile: ${err.message}`);
-      throw err;
-    }
-  }
-
-  async getDailyQuestions(subject: string, grade: number): Promise<Question[]> {
-    try {
-      const results = await db
-        .select()
-        .from(questions)
-        .where(eq(questions.subject, subject))
-        .where(eq(questions.grade, grade))
-        .limit(20);
-
-      log(`Retrieved ${results.length} questions for subject: ${subject}, grade: ${grade}`);
-      return results;
-    } catch (err) {
-      log(`Error getting daily questions: ${err.message}`);
-      throw err;
-    }
-  }
   async getUserByStripeCustomerId(customerId: string): Promise<User | undefined> {
     try {
       const results = await db
@@ -165,9 +174,9 @@ export class DatabaseStorage implements IStorage {
         .from(users)
         .where(eq(users.stripeCustomerId, customerId));
       return results[0];
-    } catch (err) {
-      log(`Error getting user by Stripe customer ID: ${err.message}`);
-      throw err;
+    } catch (error) {
+      log(`Error getting user by Stripe customer ID: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
@@ -179,9 +188,9 @@ export class DatabaseStorage implements IStorage {
         .where(eq(users.id, userId))
         .returning();
       return result[0];
-    } catch (err) {
-      log(`Error updating subscription status: ${err.message}`);
-      throw err;
+    } catch (error) {
+      log(`Error updating subscription status: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 }

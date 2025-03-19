@@ -266,14 +266,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const data = insertProfileSchema.parse(req.body);
-      const profile = await storage.createStudentProfile({
-        ...data,
-        userId: req.user.id,
-        lastQuestionDate: new Date().toISOString(),
-      });
 
-      res.json(profile);
+      // Create a subject entry for each selected subject
+      const subjects = await storage.createUserSubjects(
+        req.user.id,
+        data.subjects,
+        data.grade
+      );
+
+      res.json(subjects);
     } catch (err) {
+      log(`Error creating profile: ${err instanceof Error ? err.message : String(err)}`);
       res.status(400).json({ error: "Invalid profile data" });
     }
   });
@@ -283,12 +286,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).send("Not authenticated");
     }
 
-    const profile = await storage.getStudentProfile(req.user.id);
-    if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
-    }
+    try {
+      const subjects = await storage.getUserSubjects(req.user.id);
+      if (!subjects.length) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
 
-    res.json(profile);
+      // Transform the subjects array into the expected format
+      const profile = {
+        userId: req.user.id,
+        subjects: [...new Set(subjects.map(s => s.subject))],
+        grade: subjects[0].grade, // All subjects have the same grade
+        lastQuestionDate: subjects[0].lastQuestionDate
+      };
+
+      res.json(profile);
+    } catch (err) {
+      log(`Error fetching profile: ${err instanceof Error ? err.message : String(err)}`);
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
   });
 
   app.get('/api/questions', async (req, res) => {
@@ -297,35 +313,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const profile = await storage.getStudentProfile(req.user.id);
-      if (!profile) {
+      const userSubjects = await storage.getUserSubjects(req.user.id);
+      if (!userSubjects.length) {
         return res.status(404).json({ error: "Profile not found" });
       }
 
       const questionsBySubject: Record<string, Question[]> = {};
       let hasValidQuestions = true;
 
-      // Validate subject access
-      for (const subject of profile.subjects) {
-        const questions = await getDailyQuestions(subject, profile.grade, 20);
+      // Get questions for each subject
+      for (const subjectRecord of userSubjects) {
+        const questions = await storage.getDailyQuestions(
+          subjectRecord.subject,
+          subjectRecord.grade
+        );
 
-        // Strict validation: ensure we have questions and they match the exact grade level
         if (questions.length === 0) {
-          log(`Error: No questions found for subject ${subject}, grade ${profile.grade}`);
+          log(`No questions found for subject ${subjectRecord.subject}, grade ${subjectRecord.grade}`);
           hasValidQuestions = false;
           break;
         }
 
-        // Additional validation to ensure grade level match
-        const validGradeQuestions = questions.filter(q => q.grade === profile.grade);
-        if (validGradeQuestions.length === 0) {
-          log(`Error: No questions found for exact grade ${profile.grade} in subject ${subject}`);
-          hasValidQuestions = false;
-          break;
-        }
-
-        questionsBySubject[subject] = validGradeQuestions;
-        log(`Generated ${validGradeQuestions.length} questions for ${subject} (Grade ${profile.grade})`);
+        questionsBySubject[subjectRecord.subject] = questions;
+        log(`Generated ${questions.length} questions for ${subjectRecord.subject} (Grade ${subjectRecord.grade})`);
       }
 
       if (!hasValidQuestions) {
@@ -334,7 +344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Only try to send email if we have valid questions
+      // Send email with questions
       try {
         await sendDailyQuestions(
           req.user.email,
