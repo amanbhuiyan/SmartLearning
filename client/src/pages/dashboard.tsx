@@ -64,10 +64,11 @@ export default function Dashboard() {
   const subjectsDisplay = profile.subjects.map(s => 
     s.charAt(0).toUpperCase() + s.slice(1)
   ).join(", ");
+
   const today = format(new Date(), "EEEE, MMMM do");
   const isTrialActive = user?.trialEndsAt && new Date(user.trialEndsAt) > new Date();
   const trialEndsDate = user?.trialEndsAt ? format(new Date(user.trialEndsAt), "MMMM do") : null;
-  const hasActiveSubscription = user?.isSubscribed && user?.stripeSubscriptionId;
+  const hasActiveSubscription = user?.isSubscribed && user?.stripeSubscriptionId && user.stripeCustomerId;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
@@ -93,6 +94,22 @@ export default function Dashboard() {
                   Active Subscription - Enjoy unlimited access to all learning materials!
                 </p>
               </div>
+            </CardContent>
+          </Card>
+        ) : user?.stripeSubscriptionId && !hasActiveSubscription ? (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="p-4 flex items-center justify-between">
+              <p className="text-yellow-800">
+                Subscription payment pending. Please complete your payment to access all features.
+              </p>
+              <Button 
+                variant="default"
+                onClick={handleSubscribe}
+                className="bg-yellow-600 hover:bg-yellow-700"
+              >
+                <CreditCard className="mr-2 h-4 w-4" />
+                Complete Subscription
+              </Button>
             </CardContent>
           </Card>
         ) : isTrialActive ? (
