@@ -8,8 +8,8 @@
       "name": "questions",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
+        "question_id": {
+          "name": "question_id",
           "type": "serial",
           "primaryKey": true,
           "notNull": true
@@ -48,17 +48,14 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
+      "uniqueConstraints": {}
     },
-    "public.student_profiles": {
-      "name": "student_profiles",
+    "public.student_subjects": {
+      "name": "student_subjects",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
+        "student_subject_id": {
+          "name": "student_subject_id",
           "type": "serial",
           "primaryKey": true,
           "notNull": true
@@ -67,11 +64,11 @@
           "name": "user_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "subjects": {
-          "name": "subjects",
-          "type": "text[]",
+        "subject": {
+          "name": "subject",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -90,32 +87,29 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "student_profiles_user_id_users_id_fk": {
-          "name": "student_profiles_user_id_users_id_fk",
-          "tableFrom": "student_profiles",
+        "student_subjects_user_id_users_user_id_fk": {
+          "name": "student_subjects_user_id_users_user_id_fk",
+          "tableFrom": "student_subjects",
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
           "columnsTo": [
-            "id"
+            "user_id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
+      "uniqueConstraints": {}
     },
     "public.users": {
       "name": "users",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
+        "user_id": {
+          "name": "user_id",
           "type": "serial",
           "primaryKey": true,
           "notNull": true
@@ -181,18 +175,11 @@
             "email"
           ]
         }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
+      }
     }
   },
   "enums": {},
   "schemas": {},
-  "sequences": {},
-  "roles": {},
-  "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

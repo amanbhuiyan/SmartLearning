@@ -231,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Update user with Stripe info
-      await storage.updateUserStripeInfo(user.id, {
+      await storage.updateUserStripeInfo(user.user_id, {
         customerId: customer.id,
         subscriptionId: subscription.id
       });
@@ -269,7 +269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create a subject entry for each selected subject
       const subjects = await storage.createUserSubjects(
-        req.user.id,
+        req.user.user_id,
         data.subjects,
         data.grade
       );
@@ -287,16 +287,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const subjects = await storage.getUserSubjects(req.user.id);
+      const subjects = await storage.getUserSubjects(req.user.user_id);
       if (!subjects.length) {
         return res.status(404).json({ error: "Profile not found" });
       }
 
       // Transform the subjects array into the expected format
       const profile = {
-        userId: req.user.id,
+        userId: req.user.user_id,
         subjects: [...new Set(subjects.map(s => s.subject))],
-        grade: subjects[0].grade, // All subjects have the same grade
+        grade: subjects[0].grade,
         lastQuestionDate: subjects[0].lastQuestionDate
       };
 
@@ -313,7 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const userSubjects = await storage.getUserSubjects(req.user.id);
+      const userSubjects = await storage.getUserSubjects(req.user.user_id);
       if (!userSubjects.length) {
         return res.status(404).json({ error: "Profile not found" });
       }
@@ -364,15 +364,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/logout", (req, res, next) => {
-    if (req.user?.id && activeIntervals.has(req.user.id)) {
-      clearInterval(activeIntervals.get(req.user.id));
-      activeIntervals.delete(req.user.id);
-      log(`Cleared periodic questions for user ${req.user.id}`);
+    if (req.user?.user_id && activeIntervals.has(req.user.user_id)) {
+      clearInterval(activeIntervals.get(req.user.user_id));
+      activeIntervals.delete(req.user.user_id);
+      log(`Cleared periodic questions for user ${req.user.user_id}`);
     }
     req.logout((err) => {
       if (err) return next(err);
       res.sendStatus(200);
     });
+  });
+
+  // Stripe webhook handler
+  app.post('/api/stripe-webhook', async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig as string,
+        process.env.STRIPE_WEBHOOK_SECRET as string
+      );
+    } catch (err: any) {
+      log(`Webhook Error: ${err.message}`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case 'payment_intent.succeeded':
+        const paymentIntent = event.data.object;
+        try {
+          const subscription = await stripe.subscriptions.retrieve(paymentIntent.metadata.subscriptionId);
+          const user = await storage.getUser(parseInt(paymentIntent.metadata.userId));
+          if (user) {
+            await storage.updateUserStripeInfo(user.user_id, {
+              customerId: subscription.customer as string,
+              subscriptionId: subscription.id,
+            });
+          }
+        } catch (error) {
+          log(`Error updating subscription status: ${error}`);
+        }
+        break;
+      case 'customer.subscription.deleted':
+        const subscription = event.data.object;
+        try {
+          const user = await storage.getUserByStripeCustomerId(subscription.customer as string);
+          if (user) {
+            await storage.updateSubscriptionStatus(user.user_id, false);
+          }
+        } catch (error) {
+          log(`Error handling subscription deletion: ${error}`);
+        }
+        break;
+      default:
+        log(`Unhandled event type ${event.type}`);
+    }
+
+    res.json({ received: true });
   });
 
   app.post('/api/test-email-no-auth', async (req, res) => {
@@ -433,60 +485,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-  // Add a webhook handler for Stripe events
-  app.post('/api/stripe-webhook', async (req, res) => {
-    const sig = req.headers['stripe-signature'];
-
-    let event;
-
-    try {
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        sig as string,
-        process.env.STRIPE_WEBHOOK_SECRET as string
-      );
-    } catch (err: any) {
-      log(`Webhook Error: ${err.message}`);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    // Handle the event
-    switch (event.type) {
-      case 'payment_intent.succeeded':
-        const paymentIntent = event.data.object;
-        // Update user subscription status
-        try {
-          const subscription = await stripe.subscriptions.retrieve(paymentIntent.metadata.subscriptionId);
-          const user = await storage.getUser(parseInt(paymentIntent.metadata.userId));
-          if (user) {
-            await storage.updateUserStripeInfo(user.user_id, {
-              customerId: subscription.customer as string,
-              subscriptionId: subscription.id,
-            });
-          }
-        } catch (error) {
-          log(`Error updating subscription status: ${error}`);
-        }
-        break;
-      case 'customer.subscription.deleted':
-        const subscription = event.data.object;
-        // Handle subscription cancellation
-        try {
-          const user = await storage.getUserByStripeCustomerId(subscription.customer as string);
-          if (user) {
-            await storage.updateSubscriptionStatus(user.user_id, false);
-          }
-        } catch (error) {
-          log(`Error handling subscription deletion: ${error}`);
-        }
-        break;
-      default:
-        log(`Unhandled event type ${event.type}`);
-    }
-
-    res.json({ received: true });
-  });
-
   const httpServer = createServer(app);
   return httpServer;
 }

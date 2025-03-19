@@ -1,5 +1,5 @@
 CREATE TABLE "questions" (
-	"id" serial PRIMARY KEY NOT NULL,
+	"question_id" serial PRIMARY KEY NOT NULL,
 	"subject" text NOT NULL,
 	"grade" integer NOT NULL,
 	"question" text NOT NULL,
@@ -7,16 +7,16 @@ CREATE TABLE "questions" (
 	"explanation" text
 );
 --> statement-breakpoint
-CREATE TABLE "student_profiles" (
-	"id" serial PRIMARY KEY NOT NULL,
-	"user_id" integer,
+CREATE TABLE "student_subjects" (
+	"student_subject_id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
 	"subjects" text[] NOT NULL,
 	"grade" integer NOT NULL,
 	"last_question_date" date
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
-	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" serial PRIMARY KEY NOT NULL,
 	"email" text NOT NULL,
 	"password" text NOT NULL,
 	"first_name" text NOT NULL,
@@ -28,4 +28,4 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
-ALTER TABLE "student_profiles" ADD CONSTRAINT "student_profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "student_subjects" ADD CONSTRAINT "student_subjects_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "users"("user_id") ON DELETE CASCADE ON UPDATE NO ACTION;
