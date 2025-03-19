@@ -9,15 +9,23 @@ import HomePage from "@/pages/home-page";
 import Dashboard from "@/pages/dashboard";
 import Subscribe from "@/pages/subscribe";
 import { ProtectedRoute } from "./lib/protected-route";
+import { Header } from "@/components/ui/header";
 
 function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      <ProtectedRoute path="/" component={HomePage} />
-      <ProtectedRoute path="/dashboard" component={Dashboard} />
-      <ProtectedRoute path="/subscribe" component={Subscribe} />
-      <Route component={NotFound} />
+      <Route>
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <Switch>
+            <ProtectedRoute path="/" component={HomePage} />
+            <ProtectedRoute path="/dashboard" component={Dashboard} />
+            <ProtectedRoute path="/subscribe" component={Subscribe} />
+            <Route component={NotFound} />
+          </Switch>
+        </div>
+      </Route>
     </Switch>
   );
 }
