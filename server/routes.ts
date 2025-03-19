@@ -23,10 +23,24 @@ const activeIntervals = new Map<number, NodeJS.Timeout>();
 
 // Function to check if a user is eligible for emails
 async function isUserEligible(user: User): Promise<boolean> {
-  // User is eligible if they're in trial period or have active subscription
-  const isInTrialPeriod = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
-  const hasActiveSubscription = user.isSubscribed && user.stripeSubscriptionId && user.stripeCustomerId;
-  return isInTrialPeriod || hasActiveSubscription;
+  try {
+    // Check trial period
+    const isInTrialPeriod = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
+
+    // Check subscription
+    const hasActiveSubscription = user.isSubscribed && user.stripeSubscriptionId && user.stripeCustomerId;
+
+    log(`User ${user.id} (${user.email}) eligibility check:
+      Trial ends: ${user.trialEndsAt}
+      Is in trial: ${isInTrialPeriod}
+      Has subscription: ${hasActiveSubscription}
+    `);
+
+    return isInTrialPeriod || hasActiveSubscription;
+  } catch (error) {
+    log(`Error checking eligibility for user ${user.id}: ${error}`);
+    return false;
+  }
 }
 
 // Function to send questions to all eligible users
@@ -96,7 +110,6 @@ function startGlobalEmailInterval() {
     log('Cleared existing global email interval');
   }
 
-  // Create new interval - send questions every 5 minutes
   log('Starting new global email interval');
   globalEmailInterval = setInterval(sendQuestionsToAllEligibleUsers, 5 * 60 * 1000);
 
