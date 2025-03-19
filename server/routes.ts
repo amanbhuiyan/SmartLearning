@@ -7,6 +7,8 @@ import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
 import { log } from "./vite";
 import Stripe from 'stripe';
+import { db, User } from "./db"; // Assuming db and User are imported from "./db"
+
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -64,6 +66,65 @@ async function sendQuestionsToUser(userId: number) {
   }
 }
 
+// Function to check if a user is eligible for emails
+async function isUserEligible(user: User): Promise<boolean> {
+  // User is eligible if they're in trial period or have active subscription
+  const isInTrialPeriod = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
+  const hasActiveSubscription = user.isSubscribed && user.stripeSubscriptionId && user.stripeCustomerId;
+  return isInTrialPeriod || hasActiveSubscription;
+}
+
+// Function to send questions to all eligible users
+async function sendQuestionsToAllEligibleUsers() {
+  try {
+    log('Starting to send questions to all eligible users');
+
+    // Get all users from the database
+    const allUsers = await db.select().from(users);
+
+    for (const user of allUsers) {
+      try {
+        // Check if user is eligible
+        if (await isUserEligible(user)) {
+          const profile = await storage.getStudentProfile(user.id);
+
+          if (profile) {
+            log(`Found eligible user ${user.id} (${user.email}) with profile`);
+
+            // Generate questions for each subject
+            const questionsBySubject: Record<string, Question[]> = {};
+            for (const subject of profile.subjects) {
+              const questions = getDailyQuestions(subject, profile.grade, 20);
+              questionsBySubject[subject] = questions;
+              log(`Generated ${questions.length} questions for ${subject}`);
+            }
+
+            // Send email
+            try {
+              await sendDailyQuestions(
+                user.email,
+                user.firstName,
+                questionsBySubject
+              );
+              log(`Successfully sent questions email to ${user.email}`);
+            } catch (error) {
+              log(`Failed to send email to ${user.email}: ${error}`);
+            }
+          } else {
+            log(`Eligible user ${user.id} has no profile yet`);
+          }
+        } else {
+          log(`User ${user.id} (${user.email}) is not eligible for emails`);
+        }
+      } catch (error) {
+        log(`Error processing user ${user.id}: ${error}`);
+      }
+    }
+  } catch (error) {
+    log(`Error in sendQuestionsToAllEligibleUsers: ${error}`);
+  }
+}
+
 // Function to start periodic questions for a user
 function startPeriodicQuestions(userId: number) {
   // Clear any existing interval
@@ -76,18 +137,19 @@ function startPeriodicQuestions(userId: number) {
   // Create new interval - send questions every 5 minutes
   log(`Starting new periodic questions interval for user ${userId}`);
   const interval = setInterval(() => {
-    log(`Triggering periodic questions for user ${userId}`);
-    sendQuestionsToUser(userId);
+    log(`Triggering periodic questions for all eligible users`);
+    sendQuestionsToAllEligibleUsers(); // Changed to send to all eligible users
   }, 5 * 60 * 1000); // Every 5 minutes (5 minutes * 60 seconds * 1000 milliseconds)
 
   activeIntervals.set(userId, interval);
 
   // Send the first batch immediately
-  log(`Sending initial questions for user ${userId}`);
-  sendQuestionsToUser(userId);
+  log(`Sending initial questions for all eligible users`);
+  sendQuestionsToAllEligibleUsers(); // Changed to send to all eligible users
 
   log(`Started periodic questions for user ${userId}`);
 }
+
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
