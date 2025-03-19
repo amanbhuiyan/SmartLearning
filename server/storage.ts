@@ -19,6 +19,7 @@ export interface IStorage {
   sessionStore: session.Store;
   getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
   updateSubscriptionStatus(userId: number, isSubscribed: boolean): Promise<User>;
+  getAllUsers(): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -35,6 +36,18 @@ export class DatabaseStorage implements IStorage {
       },
       createTableIfMissing: true,
     });
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    try {
+      log('Fetching all users from database');
+      const results = await db.select().from(users);
+      log(`Found ${results.length} users`);
+      return results;
+    } catch (error) {
+      log(`Error getting all users: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
   }
 
   async getUser(id: number): Promise<User | undefined> {
