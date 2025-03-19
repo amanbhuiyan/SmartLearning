@@ -67,10 +67,15 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    if (!user) {
+      setLocation("/auth");
+      return;
+    }
+
+    // Only redirect to dashboard if profile exists and user has subscription access
     if (profile) {
       setLocation("/dashboard");
-    }
-    if (!user?.isSubscribed && !user?.trialEndsAt) {
+    } else if (!user.isSubscribed && !user.trialEndsAt) {
       setLocation("/subscribe");
     }
   }, [profile, user, setLocation]);
@@ -83,101 +88,106 @@ export default function HomePage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
-      <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle>Setup Your Child's Learning Profile</CardTitle>
-            <CardDescription>
-              Choose your child's grade and preferred subjects for daily questions
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                <FormField
-                  control={form.control}
-                  name="grade"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Grade Level</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                        defaultValue={field.value?.toString()}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your child's grade" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {Array.from({ length: 10 }, (_, i) => i + 1).map((grade) => (
-                            <SelectItem key={grade} value={grade.toString()}>
-                              Year {grade}
-                            </SelectItem>
+  // If there's no profile, show the profile setup form
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle>Setup Your Child's Learning Profile</CardTitle>
+              <CardDescription>
+                Choose your child's grade and preferred subjects for daily questions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                  <FormField
+                    control={form.control}
+                    name="grade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Grade Level</FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          defaultValue={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your child's grade" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {Array.from({ length: 10 }, (_, i) => i + 1).map((grade) => (
+                              <SelectItem key={grade} value={grade.toString()}>
+                                Year {grade}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="subjects"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="mb-4">
+                          <FormLabel>Subjects</FormLabel>
+                        </div>
+                        <div className="grid gap-4">
+                          {subjects.map((subject) => (
+                            <FormField
+                              key={subject.id}
+                              control={form.control}
+                              name="subjects"
+                              render={({ field }) => (
+                                <FormItem
+                                  key={subject.id}
+                                  className="flex flex-row items-start space-x-3 space-y-0"
+                                >
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value?.includes(subject.id)}
+                                      onCheckedChange={(checked) => {
+                                        return checked
+                                          ? field.onChange([...(field.value || []), subject.id])
+                                          : field.onChange(
+                                              field.value?.filter(
+                                                (value) => value !== subject.id
+                                              )
+                                            );
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="font-normal">
+                                    {subject.label}
+                                  </FormLabel>
+                                </FormItem>
+                              )}
+                            />
                           ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="subjects"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="mb-4">
-                        <FormLabel>Subjects</FormLabel>
-                      </div>
-                      <div className="grid gap-4">
-                        {subjects.map((subject) => (
-                          <FormField
-                            key={subject.id}
-                            control={form.control}
-                            name="subjects"
-                            render={({ field }) => (
-                              <FormItem
-                                key={subject.id}
-                                className="flex flex-row items-start space-x-3 space-y-0"
-                              >
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes(subject.id)}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...(field.value || []), subject.id])
-                                        : field.onChange(
-                                            field.value?.filter(
-                                              (value) => value !== subject.id
-                                            )
-                                          );
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="font-normal">
-                                  {subject.label}
-                                </FormLabel>
-                              </FormItem>
-                            )}
-                          />
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Button type="submit" className="w-full">
-                  Start Learning
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+                  <Button type="submit" className="w-full">
+                    Start Learning
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null; // This should never be reached due to the useEffect redirect
 }
