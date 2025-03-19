@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { Question } from "@shared/schema";
+import { Question, insertProfileSchema } from "@shared/schema";
 import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
 import { log } from "./vite";
@@ -387,7 +387,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-// Add type safety for subscription response
 interface StripeSubscriptionResponse {
   subscriptionId: string;
   clientSecret: string;

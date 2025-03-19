@@ -41,6 +41,8 @@ export function setupAuth(app: Express) {
     store: storage.sessionStore,
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
     }
   };
 
@@ -68,22 +70,31 @@ export function setupAuth(app: Express) {
           log(`Login successful for email: ${email}`);
           return done(null, user);
         } catch (err) {
-          const error = err as Error;
-          log(`Login error: ${error.message}`);
-          return done(error);
+          log(`Login error: ${err instanceof Error ? err.message : String(err)}`);
+          return done(err);
         }
       }
     )
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
+  passport.serializeUser((user, done) => {
+    log(`Serializing user: ${user.id}`);
+    done(null, user.id);
+  });
+
   passport.deserializeUser(async (id: number, done) => {
     try {
+      log(`Attempting to deserialize user: ${id}`);
       const user = await storage.getUser(id);
+      if (!user) {
+        log(`Deserialization failed: No user found with id: ${id}`);
+        return done(null, false);
+      }
+      log(`Successfully deserialized user: ${id}`);
       done(null, user);
     } catch (err) {
-      const error = err as Error;
-      done(error);
+      log(`Deserialization error for user ${id}: ${err instanceof Error ? err.message : String(err)}`);
+      done(err);
     }
   });
 
@@ -101,7 +112,7 @@ export function setupAuth(app: Express) {
         ...req.body,
         password: hashedPassword,
       });
-      log(`User created successfully: ${JSON.stringify(user)}`);
+      log(`User created successfully: ${JSON.stringify({ ...user, password: undefined })}`);
 
       req.login(user, (err) => {
         if (err) {
@@ -111,34 +122,51 @@ export function setupAuth(app: Express) {
         res.status(201).json(user);
       });
     } catch (err) {
-      const error = err as Error;
-      log(`Registration error: ${error.message}`);
-      next(error);
+      log(`Registration error: ${err instanceof Error ? err.message : String(err)}`);
+      next(err);
     }
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
-      if (err) return next(err);
+    passport.authenticate("local", (err: Error | null, user: SelectUser | false, info: { message: string } | undefined) => {
+      if (err) {
+        log(`Authentication error: ${err.message}`);
+        return next(err);
+      }
       if (!user) {
+        log(`Authentication failed: ${info?.message}`);
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
       req.logIn(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          log(`Login error: ${err.message}`);
+          return next(err);
+        }
+        log(`User logged in successfully: ${user.id}`);
         res.json(user);
       });
     })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
+    const userId = req.user?.id;
+    log(`Logout request for user: ${userId}`);
     req.logout((err) => {
-      if (err) return next(err);
+      if (err) {
+        log(`Logout error for user ${userId}: ${err.message}`);
+        return next(err);
+      }
+      log(`User ${userId} logged out successfully`);
       res.sendStatus(200);
     });
   });
 
   app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (!req.isAuthenticated()) {
+      log('User not authenticated');
+      return res.sendStatus(401);
+    }
+    log(`Returning user data for: ${req.user.id}`);
     res.json(req.user);
   });
 }
