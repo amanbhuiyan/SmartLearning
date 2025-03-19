@@ -78,8 +78,8 @@ export function setupAuth(app: Express) {
   );
 
   passport.serializeUser((user, done) => {
-    log(`Serializing user: ${user.id}`);
-    done(null, user.id);
+    log(`Serializing user: ${user.user_id}`);
+    done(null, user.user_id);
   });
 
   passport.deserializeUser(async (id: number, done) => {
@@ -142,14 +142,14 @@ export function setupAuth(app: Express) {
           log(`Login error: ${err.message}`);
           return next(err);
         }
-        log(`User logged in successfully: ${user.id}`);
+        log(`User logged in successfully: ${user.user_id}`);
         res.json(user);
       });
     })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
-    const userId = req.user?.id;
+    const userId = req.user?.user_id;
     log(`Logout request for user: ${userId}`);
     req.logout((err) => {
       if (err) {
@@ -166,7 +166,7 @@ export function setupAuth(app: Express) {
       log('User not authenticated');
       return res.sendStatus(401);
     }
-    log(`Returning user data for: ${req.user.id}`);
+    log(`Returning user data for: ${req.user.user_id}`);
     res.json(req.user);
   });
 }

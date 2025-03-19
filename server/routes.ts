@@ -459,7 +459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const subscription = await stripe.subscriptions.retrieve(paymentIntent.metadata.subscriptionId);
           const user = await storage.getUser(parseInt(paymentIntent.metadata.userId));
           if (user) {
-            await storage.updateUserStripeInfo(user.id, {
+            await storage.updateUserStripeInfo(user.user_id, {
               customerId: subscription.customer as string,
               subscriptionId: subscription.id,
             });
@@ -474,7 +474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const user = await storage.getUserByStripeCustomerId(subscription.customer as string);
           if (user) {
-            await storage.updateSubscriptionStatus(user.id, false);
+            await storage.updateSubscriptionStatus(user.user_id, false);
           }
         } catch (error) {
           log(`Error handling subscription deletion: ${error}`);
