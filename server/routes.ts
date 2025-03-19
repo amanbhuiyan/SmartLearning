@@ -78,7 +78,7 @@ function startPeriodicQuestions(userId: number) {
   const interval = setInterval(() => {
     log(`Triggering periodic questions for user ${userId}`);
     sendQuestionsToUser(userId);
-  }, 60 * 1000); // Every 1 minute
+  }, 5 * 60 * 1000); // Every 5 minutes (5 minutes * 60 seconds * 1000 milliseconds)
 
   activeIntervals.set(userId, interval);
 
