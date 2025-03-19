@@ -67,7 +67,7 @@ export default function Dashboard() {
     return null;
   }
 
-  if (isLoadingProfile) {
+  if (isLoadingProfile || isLoadingQuestions) {
     return (
       <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -75,13 +75,8 @@ export default function Dashboard() {
     );
   }
 
-  // Show loading state while fetching questions
-  if (isLoadingQuestions) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+  if (!profile || !questionsBySubject) {
+    return null;
   }
 
   const subjectsDisplay = profile.subjects.map(s =>
@@ -177,39 +172,42 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {questionsBySubject && Object.entries(questionsBySubject).map(([subject, questions]) => (
-              <div key={subject} className="mb-8 last:mb-0">
-                <h2 className="text-xl font-semibold mb-4 text-primary">
-                  {subject.charAt(0).toUpperCase() + subject.slice(1)}
-                </h2>
-                <Accordion type="single" collapsible className="space-y-4">
-                  {questions.map((question, index) => (
-                    <AccordionItem key={question.question_id} value={`${subject}-question-${index}`}>
-                      <AccordionTrigger className="text-left">
-                        <span className="font-medium">
-                          Question {index + 1}: {question.question}
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-2">
-                        <div>
-                          <strong className="text-primary">Answer:</strong>
-                          <p className="mt-1">{question.answer}</p>
-                        </div>
-                        {question.explanation && (
-                          <>
-                            <Separator className="my-2" />
-                            <div>
-                              <strong className="text-primary">Explanation:</strong>
-                              <p className="mt-1">{question.explanation}</p>
-                            </div>
-                          </>
-                        )}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
-            ))}
+            {profile.subjects.map(subject => {
+              const questions = questionsBySubject[subject] || [];
+              return (
+                <div key={subject} className="mb-8 last:mb-0">
+                  <h2 className="text-xl font-semibold mb-4 text-primary">
+                    {subject.charAt(0).toUpperCase() + subject.slice(1)}
+                  </h2>
+                  <Accordion type="single" collapsible className="space-y-4">
+                    {questions.map((question, index) => (
+                      <AccordionItem key={`${subject}-${index}`} value={`${subject}-question-${index}`}>
+                        <AccordionTrigger className="text-left">
+                          <span className="font-medium">
+                            Question {index + 1}: {question.question}
+                          </span>
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-2">
+                          <div>
+                            <strong className="text-primary">Answer:</strong>
+                            <p className="mt-1">{question.answer}</p>
+                          </div>
+                          {question.explanation && (
+                            <>
+                              <Separator className="my-2" />
+                              <div>
+                                <strong className="text-primary">Explanation:</strong>
+                                <p className="mt-1">{question.explanation}</p>
+                              </div>
+                            </>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>

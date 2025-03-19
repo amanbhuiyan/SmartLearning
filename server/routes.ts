@@ -45,7 +45,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Transform the subjects array into the expected format
       const profile = {
         userId: req.user.user_id,
-        subjects: [...new Set(subjects.map(s => s.subject))],
+        subjects: subjects.map(s => s.subject), // Changed to handle multiple subjects
         grade: subjects[0].grade,
         lastQuestionDate: subjects[0].lastQuestionDate
       };
@@ -72,15 +72,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate fresh questions for each subject
       for (const subjectRecord of userSubjects) {
-        const questions = getDailyQuestions(
+        log(`Generating questions for subject: ${subjectRecord.subject}, grade: ${subjectRecord.grade}`);
+        const subjectQuestions = getDailyQuestions(
           subjectRecord.subject,
           subjectRecord.grade,
           20 // Generate 20 questions per subject
         );
 
-        questionsBySubject[subjectRecord.subject] = questions;
-        log(`Generated ${questions.length} questions for ${subjectRecord.subject} (Grade ${subjectRecord.grade})`);
+        questionsBySubject[subjectRecord.subject] = subjectQuestions;
+        log(`Generated ${subjectQuestions.length} questions for ${subjectRecord.subject} (Grade ${subjectRecord.grade})`);
       }
+
+      // Verify we have questions for all subjects
+      const subjectsWithQuestions = Object.keys(questionsBySubject);
+      log(`Generated questions for subjects: ${subjectsWithQuestions.join(', ')}`);
 
       res.json(questionsBySubject);
     } catch (error) {
