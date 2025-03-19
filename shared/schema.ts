@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+  user_id: serial("user_id").primaryKey(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   firstName: text("first_name").notNull(),
@@ -16,9 +16,9 @@ export const users = pgTable("users", {
 
 // Each student can have multiple subjects
 export const studentSubjects = pgTable("student_subjects", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id")
-    .references(() => users.id, { onDelete: 'cascade' })
+  student_subject_id: serial("student_subject_id").primaryKey(),
+  user_id: integer("user_id")
+    .references(() => users.user_id, { onDelete: 'cascade' })
     .notNull(),
   subject: text("subject").notNull(),
   grade: integer("grade").notNull(),
@@ -26,7 +26,7 @@ export const studentSubjects = pgTable("student_subjects", {
 });
 
 export const questions = pgTable("questions", {
-  id: serial("id").primaryKey(),
+  question_id: serial("question_id").primaryKey(),
   subject: text("subject").notNull(),
   grade: integer("grade").notNull(),
   question: text("question").notNull(),
