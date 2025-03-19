@@ -3,12 +3,11 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { Question, insertProfileSchema } from "@shared/schema";
-import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
 import { log } from "./vite";
 import Stripe from 'stripe';
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, questions } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -80,22 +79,36 @@ class EmailQueue {
 
           // Generate questions for each subject
           const questionsBySubject: Record<string, Question[]> = {};
+          let hasValidQuestions = true;
+
           for (const subject of profile.subjects) {
-            const questions = getDailyQuestions(subject, profile.grade, 20);
+            const questions = await getDailyQuestions(subject, profile.grade, 20);
+
+            // Validate if we have enough questions for this grade and subject
+            if (questions.length === 0) {
+              log(`Error: No questions found for subject ${subject}, grade ${profile.grade}`);
+              hasValidQuestions = false;
+              break;
+            }
+
             questionsBySubject[subject] = questions;
-            log(`Generated ${questions.length} questions for ${subject}`);
+            log(`Generated ${questions.length} questions for ${subject} (Grade ${profile.grade})`);
           }
 
-          // Send email
-          try {
-            await sendDailyQuestions(
-              user.email,
-              user.firstName,
-              questionsBySubject
-            );
-            log(`Successfully sent questions email to ${user.email}`);
-          } catch (error) {
-            log(`Failed to send email to ${user.email}: ${error}`);
+          // Only send email if we have valid questions for all subjects
+          if (hasValidQuestions) {
+            try {
+              await sendDailyQuestions(
+                user.email,
+                user.firstName,
+                questionsBySubject
+              );
+              log(`Successfully sent questions email to ${user.email}`);
+            } catch (error) {
+              log(`Failed to send email to ${user.email}: ${error}`);
+            }
+          } else {
+            log(`Skipping email for user ${user.email} due to missing questions for their grade/subjects`);
           }
         } else {
           log(`Eligible user ${user.id} has no profile yet`);
@@ -283,29 +296,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).send("Not authenticated");
     }
 
-    const profile = await storage.getStudentProfile(req.user.id);
-    if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
-    }
-
-    const questionsBySubject: Record<string, Question[]> = {};
-    for (const subject of profile.subjects) {
-      const questions = getDailyQuestions(subject, profile.grade, 20);
-      questionsBySubject[subject] = questions;
-    }
-
     try {
-      await sendDailyQuestions(
-        req.user.email,
-        req.user.firstName,
-        questionsBySubject
-      );
-      log(`Questions email sent to ${req.user.email}`);
-    } catch (error) {
-      log(`Failed to send questions email: ${error}`);
-    }
+      const profile = await storage.getStudentProfile(req.user.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
 
-    res.json(questionsBySubject);
+      const questionsBySubject: Record<string, Question[]> = {};
+      let hasValidQuestions = true;
+
+      for (const subject of profile.subjects) {
+        const questions = await getDailyQuestions(subject, profile.grade, 20);
+
+        // Validate if we have enough questions for this grade and subject
+        if (questions.length === 0) {
+          log(`Error: No questions found for subject ${subject}, grade ${profile.grade}`);
+          hasValidQuestions = false;
+          break;
+        }
+
+        questionsBySubject[subject] = questions;
+        log(`Generated ${questions.length} questions for ${subject} (Grade ${profile.grade})`);
+      }
+
+      if (!hasValidQuestions) {
+        return res.status(404).json({ 
+          error: "No questions available for some subjects at your grade level" 
+        });
+      }
+
+      try {
+        await sendDailyQuestions(
+          req.user.email,
+          req.user.firstName,
+          questionsBySubject
+        );
+        log(`Questions email sent to ${req.user.email}`);
+      } catch (error) {
+        log(`Failed to send questions email: ${error}`);
+      }
+
+      res.json(questionsBySubject);
+    } catch (error) {
+      log(`Error fetching questions: ${error}`);
+      res.status(500).json({ error: "Failed to fetch questions" });
+    }
   });
 
   // Cleanup intervals on logout
@@ -324,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/test-email-no-auth', async (req, res) => {
     try {
       log("Testing email functionality without auth...");
-      const testQuestions = getDailyQuestions("math", 5, 2);
+      const testQuestions = await getDailyQuestions("math", 5, 2);
       const questionsBySubject = { math: testQuestions };
 
       // Attempt to send email with clear test subject
@@ -360,7 +395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate test questions
-      const testQuestions = getDailyQuestions("math", profile.grade, 2);
+      const testQuestions = await getDailyQuestions("math", profile.grade, 2);
       const questionsBySubject = { math: testQuestions };
 
       // Attempt to send email
@@ -440,4 +475,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 interface StripeSubscriptionResponse {
   subscriptionId: string;
   clientSecret: string;
+}
+
+async function getDailyQuestions(subject: string, grade: number, count: number = 20): Promise<Question[]> {
+  try {
+    log(`Getting ${count} questions for subject: ${subject}, grade: ${grade}`);
+    const results = await db
+      .select()
+      .from(questions)
+      .where(eq(questions.subject, subject))
+      .where(eq(questions.grade, grade))
+      .limit(count);
+
+    if (results.length < count) {
+      log(`Warning: Only found ${results.length} questions for subject ${subject}, grade ${grade}. Expected ${count} questions.`);
+    }
+
+    return results;
+  } catch (err) {
+    log(`Error getting questions: ${err}`);
+    throw new Error(`Failed to get questions for subject ${subject}, grade ${grade}: ${err}`);
+  }
 }
