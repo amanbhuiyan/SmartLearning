@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { Question, StudentProfile } from "@shared/schema";
+import { Question } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -15,18 +15,28 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 
+interface StudentProfile {
+  userId: number;
+  subjects: string[];
+  grade: number;
+  lastQuestionDate: string | null;
+}
+
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
+  // Important: Only fetch profile if user exists and use user_id in the key
   const { data: profile, isLoading: isLoadingProfile } = useQuery<StudentProfile>({
-    queryKey: ["/api/profile"],
+    queryKey: ["/api/profile", user?.user_id],
+    enabled: !!user,
   });
 
+  // Important: Only fetch questions if both user and profile exist
   const { data: questionsBySubject, isLoading: isLoadingQuestions } = useQuery<Record<string, Question[]>>({
-    queryKey: ["/api/questions"],
-    enabled: !!profile, // Only fetch questions if profile exists
+    queryKey: ["/api/questions", user?.user_id],
+    enabled: !!user && !!profile,
     onError: (error: any) => {
       toast({
         title: "Error loading questions",
@@ -45,18 +55,24 @@ export default function Dashboard() {
     navigate("/subscribe");
   };
 
+  // If not logged in, redirect to auth
+  if (!user) {
+    navigate("/auth");
+    return null;
+  }
+
+  // If no profile exists, redirect to profile setup
+  if (!isLoadingProfile && !profile) {
+    navigate("/");
+    return null;
+  }
+
   if (isLoadingProfile) {
     return (
       <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
-
-  // Redirect to profile setup if no profile exists
-  if (!profile) {
-    navigate("/");
-    return null;
   }
 
   // Show loading state while fetching questions
@@ -73,9 +89,9 @@ export default function Dashboard() {
   ).join(", ");
 
   const today = format(new Date(), "EEEE, MMMM do");
-  const isTrialActive = user?.trialEndsAt && new Date(user.trialEndsAt) > new Date();
-  const trialEndsDate = user?.trialEndsAt ? format(new Date(user.trialEndsAt), "MMMM do") : null;
-  const hasActiveSubscription = user?.isSubscribed && user?.stripeSubscriptionId && user.stripeCustomerId;
+  const isTrialActive = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
+  const trialEndsDate = user.trialEndsAt ? format(new Date(user.trialEndsAt), "MMMM do") : null;
+  const hasActiveSubscription = user.isSubscribed && user.stripeSubscriptionId && user.stripeCustomerId;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
@@ -103,7 +119,7 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-        ) : user?.stripeSubscriptionId && !hasActiveSubscription ? (
+        ) : user.stripeSubscriptionId && !hasActiveSubscription ? (
           <Card className="border-yellow-200 bg-yellow-50">
             <CardContent className="p-4 flex items-center justify-between">
               <p className="text-yellow-800">
@@ -168,7 +184,7 @@ export default function Dashboard() {
                 </h2>
                 <Accordion type="single" collapsible className="space-y-4">
                   {questions.map((question, index) => (
-                    <AccordionItem key={question.id} value={`${subject}-question-${index}`}>
+                    <AccordionItem key={question.question_id} value={`${subject}-question-${index}`}>
                       <AccordionTrigger className="text-left">
                         <span className="font-medium">
                           Question {index + 1}: {question.question}

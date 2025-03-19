@@ -77,11 +77,13 @@ export function setupAuth(app: Express) {
     )
   );
 
+  // Important: Serialize only the user_id
   passport.serializeUser((user, done) => {
     log(`Serializing user: ${user.user_id}`);
     done(null, user.user_id);
   });
 
+  // Important: Deserialize using user_id
   passport.deserializeUser(async (id: number, done) => {
     try {
       log(`Attempting to deserialize user: ${id}`);
