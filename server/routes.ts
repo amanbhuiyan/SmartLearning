@@ -21,51 +21,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 // Store active intervals by user ID
 const activeIntervals = new Map<number, NodeJS.Timeout>();
 
-// Add type safety for subscription response
-interface StripeSubscriptionResponse {
-  subscriptionId: string;
-  clientSecret: string;
-}
-
-// Function to send questions to a specific user
-async function sendQuestionsToUser(userId: number) {
-  try {
-    log(`Starting periodic questions task for user ${userId}`);
-    const user = await storage.getUser(userId);
-    const profile = await storage.getStudentProfile(userId);
-
-    if (!user || !profile) {
-      log(`Cannot send questions: User ${userId} or profile not found`);
-      return;
-    }
-
-    log(`Generating questions for user ${userId} (${user.email})`);
-
-    // Generate new questions for each subject
-    const questionsBySubject: Record<string, Question[]> = {};
-    for (const subject of profile.subjects) {
-      const questions = getDailyQuestions(subject, profile.grade, 20);
-      questionsBySubject[subject] = questions;
-      log(`Generated ${questions.length} questions for ${subject}`);
-    }
-
-    // Send email with questions
-    try {
-      log(`Attempting to send email to ${user.email}`);
-      await sendDailyQuestions(
-        user.email,
-        user.firstName,
-        questionsBySubject
-      );
-      log(`Successfully sent periodic questions email to ${user.email}`);
-    } catch (error) {
-      log(`Failed to send periodic questions email to ${user.email}: ${error}`);
-    }
-  } catch (error) {
-    log(`Error in periodic questions task for user ${userId}: ${error}`);
-  }
-}
-
 // Function to check if a user is eligible for emails
 async function isUserEligible(user: User): Promise<boolean> {
   // User is eligible if they're in trial period or have active subscription
@@ -80,7 +35,7 @@ async function sendQuestionsToAllEligibleUsers() {
     log('Starting to send questions to all eligible users');
 
     // Get all users from the database
-    const allUsers = await db.select().from(users);
+    const allUsers = await db.select().from('users'); // Assuming 'users' is the table name
 
     for (const user of allUsers) {
       try {
@@ -125,34 +80,39 @@ async function sendQuestionsToAllEligibleUsers() {
   }
 }
 
-// Function to start periodic questions for a user
-function startPeriodicQuestions(userId: number) {
-  // Clear any existing interval
-  if (activeIntervals.has(userId)) {
-    clearInterval(activeIntervals.get(userId));
-    activeIntervals.delete(userId);
-    log(`Cleared existing periodic questions for user ${userId}`);
+// Initialize global email sending interval
+let globalEmailInterval: NodeJS.Timeout | null = null;
+
+// Function to start periodic questions for all users
+function startGlobalEmailInterval() {
+  if (globalEmailInterval) {
+    clearInterval(globalEmailInterval);
+    log('Cleared existing global email interval');
   }
 
   // Create new interval - send questions every 5 minutes
-  log(`Starting new periodic questions interval for user ${userId}`);
-  const interval = setInterval(() => {
-    log(`Triggering periodic questions for all eligible users`);
-    sendQuestionsToAllEligibleUsers(); // Changed to send to all eligible users
+  log('Starting new global email interval');
+  globalEmailInterval = setInterval(() => {
+    log('Triggering periodic questions for all eligible users');
+    sendQuestionsToAllEligibleUsers();
   }, 5 * 60 * 1000); // Every 5 minutes (5 minutes * 60 seconds * 1000 milliseconds)
 
-  activeIntervals.set(userId, interval);
-
   // Send the first batch immediately
-  log(`Sending initial questions for all eligible users`);
-  sendQuestionsToAllEligibleUsers(); // Changed to send to all eligible users
-
-  log(`Started periodic questions for user ${userId}`);
+  log('Sending initial questions for all eligible users');
+  sendQuestionsToAllEligibleUsers();
 }
 
+// Add type safety for subscription response
+interface StripeSubscriptionResponse {
+  subscriptionId: string;
+  clientSecret: string;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+
+  // Start the global email interval when the server starts
+  startGlobalEmailInterval();
 
   app.post('/api/get-or-create-subscription', async (req, res) => {
     try {
@@ -233,7 +193,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add existing routes for profiles, questions, etc.
   app.post('/api/profile', async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -247,7 +206,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastQuestionDate: new Date().toISOString(),
       });
 
-      startPeriodicQuestions(req.user.id);
       res.json(profile);
     } catch (err) {
       res.status(400).json({ error: "Invalid profile data" });
@@ -264,7 +222,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    startPeriodicQuestions(req.user.id);
     res.json(profile);
   });
 
