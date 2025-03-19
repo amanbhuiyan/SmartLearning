@@ -27,6 +27,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import type { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 
 const subjects = [
   { id: "math", label: "Mathematics" },
@@ -46,6 +47,7 @@ export default function HomePage() {
   const form = useForm<z.infer<typeof insertProfileSchema>>({
     resolver: zodResolver(insertProfileSchema),
     defaultValues: {
+      childName: "",
       subjects: [],
       grade: undefined,
     },
@@ -103,6 +105,20 @@ export default function HomePage() {
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                  <FormField
+                    control={form.control}
+                    name="childName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Child's Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your child's name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="grade"

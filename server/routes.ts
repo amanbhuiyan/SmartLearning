@@ -20,6 +20,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a subject entry for each selected subject
       const subjects = await storage.createUserSubjects(
         req.user.user_id,
+        data.childName,
         data.subjects,
         data.grade
       );
@@ -45,7 +46,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Transform the subjects array into the expected format
       const profile = {
         userId: req.user.user_id,
-        subjects: subjects.map(s => s.subject), // Changed to handle multiple subjects
+        childName: subjects[0].childName,
+        subjects: subjects.map(s => s.subject),
         grade: subjects[0].grade,
         lastQuestionDate: subjects[0].lastQuestionDate
       };

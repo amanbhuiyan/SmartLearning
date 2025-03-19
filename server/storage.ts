@@ -15,7 +15,7 @@ export interface IStorage {
   updateStripeCustomerId(userId: number, customerId: string): Promise<User>;
   updateUserStripeInfo(userId: number, info: { customerId: string, subscriptionId: string }): Promise<User>;
   getUserSubjects(userId: number): Promise<StudentSubject[]>;
-  createUserSubjects(userId: number, subjects: string[], grade: number): Promise<StudentSubject[]>;
+  createUserSubjects(userId: number, childName: string, subjects: string[], grade: number): Promise<StudentSubject[]>;
   sessionStore: session.Store;
   getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
   updateSubscriptionStatus(userId: number, isSubscribed: boolean): Promise<User>;
@@ -98,11 +98,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createUserSubjects(userId: number, subjects: string[], grade: number): Promise<StudentSubject[]> {
+  async createUserSubjects(userId: number, childName: string, subjects: string[], grade: number): Promise<StudentSubject[]> {
     try {
       log(`Creating subjects for user ${userId}: ${subjects.join(', ')}`);
       const subjectEntries = subjects.map(subject => ({
         user_id: userId,
+        childName,
         subject,
         grade,
         lastQuestionDate: new Date().toISOString(),

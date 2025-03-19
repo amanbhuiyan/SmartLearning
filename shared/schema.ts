@@ -20,6 +20,7 @@ export const studentSubjects = pgTable("student_subjects", {
   user_id: integer("user_id")
     .references(() => users.user_id, { onDelete: 'cascade' })
     .notNull(),
+  childName: text("child_name").notNull(),
   subject: text("subject").notNull(),
   grade: integer("grade").notNull(),
   lastQuestionDate: date("last_question_date"),
@@ -41,6 +42,7 @@ export const loginSchema = z.object({
 
 // Schema for profile setup
 export const insertProfileSchema = z.object({
+  childName: z.string().min(1, "Child's name is required"),
   subjects: z.array(z.enum(['math', 'english'])).min(1, "Please select at least one subject"),
   grade: z.number().min(1).max(10),
 });

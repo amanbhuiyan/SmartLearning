@@ -17,6 +17,7 @@ import { format } from "date-fns";
 
 interface StudentProfile {
   userId: number;
+  childName: string;
   subjects: string[];
   grade: number;
   lastQuestionDate: string | null;
@@ -93,7 +94,9 @@ export default function Dashboard() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Daily Questions</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Daily Questions for {profile.childName}
+            </h1>
             <p className="text-gray-600">{today}</p>
           </div>
           <Button variant="outline" onClick={handleLogout}>
