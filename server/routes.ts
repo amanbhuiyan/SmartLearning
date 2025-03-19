@@ -73,12 +73,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate fresh questions for each subject
       for (const subjectRecord of userSubjects) {
         log(`Generating questions for subject: ${subjectRecord.subject}, grade: ${subjectRecord.grade}`);
+
+        // Generate questions for this subject
         const subjectQuestions = getDailyQuestions(
           subjectRecord.subject,
           subjectRecord.grade,
           20 // Generate 20 questions per subject
         );
 
+        // Add questions to the subject map
         questionsBySubject[subjectRecord.subject] = subjectQuestions;
         log(`Generated ${subjectQuestions.length} questions for ${subjectRecord.subject} (Grade ${subjectRecord.grade})`);
       }
@@ -86,6 +89,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify we have questions for all subjects
       const subjectsWithQuestions = Object.keys(questionsBySubject);
       log(`Generated questions for subjects: ${subjectsWithQuestions.join(', ')}`);
+
+      if (subjectsWithQuestions.length !== userSubjects.length) {
+        log(`Warning: Not all subjects have questions. Expected ${userSubjects.length} subjects, got ${subjectsWithQuestions.length}`);
+      }
 
       res.json(questionsBySubject);
     } catch (error) {
