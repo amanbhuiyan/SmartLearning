@@ -23,15 +23,16 @@ export function UserProfileDropdown() {
     navigate("/auth");
   };
 
-  // Create initials from first and last name
-  const initials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+  const fullName = `${user.firstName} ${user.lastName}`;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-          <Avatar>
-            <AvatarFallback>{initials}</AvatarFallback>
+          <Avatar className="h-10 w-10">
+            <AvatarFallback className="text-xs">
+              {`${user.firstName[0]}${user.lastName[0]}`}
+            </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
@@ -39,7 +40,7 @@ export function UserProfileDropdown() {
         <DropdownMenuLabel>
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">
-              {user.firstName} {user.lastName}
+              {fullName}
             </p>
             <p className="text-xs leading-none text-muted-foreground">
               {user.email}
