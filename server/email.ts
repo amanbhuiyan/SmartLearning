@@ -60,7 +60,7 @@ export async function sendDailyQuestions(
 
     log("Sending email via Resend API...");
     const { data, error } = await resend.emails.send({
-      from: 'Smart Learning <info@asn-global.co.uk>',  // Using your domain
+      from: 'Smart Learning <info@asn-global.co.uk>',  // Using verified domain
       to: [email],
       subject: 'Your Daily Learning Questions',
       html: emailHtml,
@@ -69,22 +69,22 @@ export async function sendDailyQuestions(
 
     if (error) {
       log(`Resend API Error: ${JSON.stringify(error)}`);
-      // If domain verification error, fall back to resend.dev domain...
+      // If domain verification error, attempt one more time...
       if (error.statusCode === 403 && error.message?.includes('domain is not verified')) {
-        log('Falling back to resend.dev domain...');
-        const fallbackResponse = await resend.emails.send({
-          from: 'Smart Learning <onboarding@resend.dev>',  // Using Resend's verified domain
+        log('Retrying with same domain...');
+        const retryResponse = await resend.emails.send({
+          from: 'EduQuest <info@asn-global.co.uk>',  // Using verified domain for retry
           to: [email],
           subject: 'Your Daily Learning Questions',
           html: emailHtml,
           text: 'This email contains your daily learning questions. Please view in an HTML-capable email client.',
         });
 
-        if (fallbackResponse.error) {
-          throw fallbackResponse.error;
+        if (retryResponse.error) {
+          throw retryResponse.error;
         }
 
-        log(`Email sent successfully with fallback domain! Message ID: ${fallbackResponse.data?.id}`);
+        log(`Email sent successfully with retry! Message ID: ${retryResponse.data?.id}`);
         return;
       }
       throw error;
