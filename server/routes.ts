@@ -7,41 +7,20 @@ import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
 import { log } from "./vite";
 import Stripe from 'stripe';
-import { db, User } from "./db"; // Assuming db and User are imported from "./db"
-
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16" as const,
+  apiVersion: "2023-10-16",
 });
 
 // Store active intervals by user ID
 const activeIntervals = new Map<number, NodeJS.Timeout>();
-
-// Function to check if a user is eligible for emails
-async function isUserEligible(user: User): Promise<boolean> {
-  try {
-    // Check trial period
-    const isInTrialPeriod = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
-
-    // Check subscription
-    const hasActiveSubscription = user.isSubscribed && user.stripeSubscriptionId && user.stripeCustomerId;
-
-    log(`User ${user.id} (${user.email}) eligibility check:
-      Trial ends: ${user.trialEndsAt}
-      Is in trial: ${isInTrialPeriod}
-      Has subscription: ${hasActiveSubscription}
-    `);
-
-    return isInTrialPeriod || hasActiveSubscription;
-  } catch (error) {
-    log(`Error checking eligibility for user ${user.id}: ${error}`);
-    return false;
-  }
-}
 
 // Function to send questions to all eligible users
 async function sendQuestionsToAllEligibleUsers() {
@@ -49,15 +28,21 @@ async function sendQuestionsToAllEligibleUsers() {
     log('Starting to send questions to all eligible users');
 
     // Get all users from the database
-    const allUsers = await db.select().from('users');
-
-    // Track how many emails were sent
+    const results = await db.select().from(users);
     let emailsSent = 0;
 
-    for (const user of allUsers) {
+    for (const user of results) {
       try {
-        // Check if user is eligible
-        if (await isUserEligible(user)) {
+        log(`User ${user.id} (${user.email}) eligibility check:
+          Trial ends: ${user.trialEndsAt}
+          Is subscribed: ${user.isSubscribed}
+          Has subscription ID: ${!!user.stripeSubscriptionId}
+        `);
+
+        const isInTrialPeriod = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
+        const isSubscribed = user.isSubscribed && user.stripeSubscriptionId;
+
+        if (isInTrialPeriod || isSubscribed) {
           const profile = await storage.getStudentProfile(user.id);
 
           if (profile) {
@@ -113,14 +98,9 @@ function startGlobalEmailInterval() {
   log('Starting new global email interval');
   globalEmailInterval = setInterval(sendQuestionsToAllEligibleUsers, 5 * 60 * 1000);
 
-  // Don't send emails immediately on server start
-  log('Global email interval set up. First batch will be sent in 5 minutes.');
-}
-
-// Add type safety for subscription response
-interface StripeSubscriptionResponse {
-  subscriptionId: string;
-  clientSecret: string;
+  // Start first batch after 1 minute
+  setTimeout(sendQuestionsToAllEligibleUsers, 60 * 1000);
+  log('Global email interval set up. First batch will be sent in 1 minute, then every 5 minutes.');
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -397,4 +377,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
   return httpServer;
+}
+
+interface StripeSubscriptionResponse {
+  subscriptionId: string;
+  clientSecret: string;
 }
