@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertProfileSchema, Question } from "@shared/schema";
+import { Question } from "@shared/schema";
 import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
 import { log } from "./vite";
@@ -22,9 +22,19 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 // Store active intervals by user ID
 const activeIntervals = new Map<number, NodeJS.Timeout>();
 
+// Flag to track if we're currently processing emails
+let isProcessingEmails = false;
+
 // Function to send questions to all eligible users
 async function sendQuestionsToAllEligibleUsers() {
+  // If we're already processing emails, skip this run
+  if (isProcessingEmails) {
+    log('Email processing already in progress, skipping this interval');
+    return;
+  }
+
   try {
+    isProcessingEmails = true;
     log('Starting to send questions to all eligible users');
 
     // Get all users from the database
@@ -74,14 +84,16 @@ async function sendQuestionsToAllEligibleUsers() {
         } else {
           log(`User ${user.id} (${user.email}) is not eligible for emails`);
         }
-      } catch (error) {
-        log(`Error processing user ${user.id}: ${error}`);
+      } catch (err) {
+        log(`Error processing user ${user.id}: ${err}`);
       }
     }
 
     log(`Email sending batch completed. Total emails sent: ${emailsSent}`);
-  } catch (error) {
-    log(`Error in sendQuestionsToAllEligibleUsers: ${error}`);
+  } catch (err) {
+    log(`Error in sendQuestionsToAllEligibleUsers: ${err}`);
+  } finally {
+    isProcessingEmails = false;
   }
 }
 
