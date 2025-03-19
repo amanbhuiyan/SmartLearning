@@ -35,7 +35,10 @@ async function sendQuestionsToAllEligibleUsers() {
     log('Starting to send questions to all eligible users');
 
     // Get all users from the database
-    const allUsers = await db.select().from('users'); // Assuming 'users' is the table name
+    const allUsers = await db.select().from('users');
+
+    // Track how many emails were sent
+    let emailsSent = 0;
 
     for (const user of allUsers) {
       try {
@@ -44,7 +47,7 @@ async function sendQuestionsToAllEligibleUsers() {
           const profile = await storage.getStudentProfile(user.id);
 
           if (profile) {
-            log(`Found eligible user ${user.id} (${user.email}) with profile`);
+            log(`Processing eligible user ${user.id} (${user.email}) with profile`);
 
             // Generate questions for each subject
             const questionsBySubject: Record<string, Question[]> = {};
@@ -61,7 +64,8 @@ async function sendQuestionsToAllEligibleUsers() {
                 user.firstName,
                 questionsBySubject
               );
-              log(`Successfully sent questions email to ${user.email}`);
+              emailsSent++;
+              log(`Successfully sent questions email to ${user.email} (Total sent: ${emailsSent})`);
             } catch (error) {
               log(`Failed to send email to ${user.email}: ${error}`);
             }
@@ -75,6 +79,8 @@ async function sendQuestionsToAllEligibleUsers() {
         log(`Error processing user ${user.id}: ${error}`);
       }
     }
+
+    log(`Email sending batch completed. Total emails sent: ${emailsSent}`);
   } catch (error) {
     log(`Error in sendQuestionsToAllEligibleUsers: ${error}`);
   }
@@ -92,14 +98,10 @@ function startGlobalEmailInterval() {
 
   // Create new interval - send questions every 5 minutes
   log('Starting new global email interval');
-  globalEmailInterval = setInterval(() => {
-    log('Triggering periodic questions for all eligible users');
-    sendQuestionsToAllEligibleUsers();
-  }, 5 * 60 * 1000); // Every 5 minutes (5 minutes * 60 seconds * 1000 milliseconds)
+  globalEmailInterval = setInterval(sendQuestionsToAllEligibleUsers, 5 * 60 * 1000);
 
-  // Send the first batch immediately
-  log('Sending initial questions for all eligible users');
-  sendQuestionsToAllEligibleUsers();
+  // Don't send emails immediately on server start
+  log('Global email interval set up. First batch will be sent in 5 minutes.');
 }
 
 // Add type safety for subscription response
