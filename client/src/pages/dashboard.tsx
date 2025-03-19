@@ -22,24 +22,10 @@ export default function Dashboard() {
 
   const { data: profile, isLoading: isLoadingProfile } = useQuery<StudentProfile>({
     queryKey: ["/api/profile"],
-    onError: (error: Error) => {
-      toast({
-        title: "Error loading profile",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
   });
 
   const { data: questionsBySubject, isLoading: isLoadingQuestions } = useQuery<Record<string, Question[]>>({
     queryKey: ["/api/questions"],
-    onError: (error: Error) => {
-      toast({
-        title: "Error loading questions",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
   });
 
   const handleLogout = async () => {
@@ -81,7 +67,7 @@ export default function Dashboard() {
   const today = format(new Date(), "EEEE, MMMM do");
   const isTrialActive = user?.trialEndsAt && new Date(user.trialEndsAt) > new Date();
   const trialEndsDate = user?.trialEndsAt ? format(new Date(user.trialEndsAt), "MMMM do") : null;
-  const hasActiveSubscription = user?.isSubscribed;
+  const hasActiveSubscription = user?.isSubscribed && user?.stripeSubscriptionId;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
