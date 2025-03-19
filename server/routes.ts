@@ -25,6 +25,9 @@ const activeIntervals = new Map<number, NodeJS.Timeout>();
 // Flag to track if we're currently processing emails
 let isProcessingEmails = false;
 
+// Initialize global email interval
+let globalEmailInterval: NodeJS.Timeout | null = null;
+
 // Function to send questions to all eligible users
 async function sendQuestionsToAllEligibleUsers() {
   // If we're already processing emails, skip this run
@@ -97,10 +100,7 @@ async function sendQuestionsToAllEligibleUsers() {
   }
 }
 
-// Initialize global email sending interval
-let globalEmailInterval: NodeJS.Timeout | null = null;
-
-// Function to start periodic questions for all users
+// Function to start global email interval
 function startGlobalEmailInterval() {
   if (globalEmailInterval) {
     clearInterval(globalEmailInterval);
@@ -387,6 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
+// Add type safety for subscription response
 interface StripeSubscriptionResponse {
   subscriptionId: string;
   clientSecret: string;
