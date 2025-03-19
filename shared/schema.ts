@@ -25,15 +25,6 @@ export const studentSubjects = pgTable("student_subjects", {
   lastQuestionDate: date("last_question_date"),
 });
 
-export const questions = pgTable("questions", {
-  question_id: serial("question_id").primaryKey(),
-  subject: text("subject").notNull(),
-  grade: integer("grade").notNull(),
-  question: text("question").notNull(),
-  answer: text("answer").notNull(),
-  explanation: text("explanation"),
-});
-
 // Schema for registration
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
@@ -54,8 +45,14 @@ export const insertProfileSchema = z.object({
   grade: z.number().min(1).max(10),
 });
 
+// Question type definition (for runtime use only, not stored in DB)
+export interface Question {
+  question: string;
+  answer: string;
+  explanation: string;
+}
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
 export type User = typeof users.$inferSelect;
 export type StudentSubject = typeof studentSubjects.$inferSelect;
-export type Question = typeof questions.$inferSelect;

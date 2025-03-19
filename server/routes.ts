@@ -4,30 +4,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { Question, insertProfileSchema } from "@shared/schema";
 import { log } from "./vite";
-import { db } from "./db";
-import { questions } from "@shared/schema";
-import { eq } from "drizzle-orm";
-
-async function getDailyQuestions(subject: string, grade: number, count: number = 20): Promise<Question[]> {
-  try {
-    log(`Getting ${count} questions for subject: ${subject}, grade: ${grade}`);
-    const results = await db
-      .select()
-      .from(questions)
-      .where(eq(questions.subject, subject))
-      .where(eq(questions.grade, grade))
-      .limit(count);
-
-    if (results.length < count) {
-      log(`Warning: Only found ${results.length} questions for subject ${subject}, grade ${grade}. Expected ${count} questions.`);
-    }
-
-    return results;
-  } catch (err) {
-    log(`Error getting questions: ${err}`);
-    throw new Error(`Failed to get questions for subject ${subject}, grade ${grade}: ${err}`);
-  }
-}
+import { getDailyQuestions } from "./questions";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -93,29 +70,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const questionsBySubject: Record<string, Question[]> = {};
 
-      // Get questions for each subject
+      // Generate fresh questions for each subject
       for (const subjectRecord of userSubjects) {
-        const questions = await getDailyQuestions(
+        const questions = getDailyQuestions(
           subjectRecord.subject,
-          subjectRecord.grade
+          subjectRecord.grade,
+          20 // Generate 20 questions per subject
         );
 
-        if (questions.length > 0) {
-          questionsBySubject[subjectRecord.subject] = questions;
-          log(`Generated ${questions.length} questions for ${subjectRecord.subject} (Grade ${subjectRecord.grade})`);
-        }
-      }
-
-      if (Object.keys(questionsBySubject).length === 0) {
-        return res.status(404).json({ 
-          error: "No questions available for your selected grade level and subjects" 
-        });
+        questionsBySubject[subjectRecord.subject] = questions;
+        log(`Generated ${questions.length} questions for ${subjectRecord.subject} (Grade ${subjectRecord.grade})`);
       }
 
       res.json(questionsBySubject);
     } catch (error) {
-      log(`Error fetching questions: ${error}`);
-      res.status(500).json({ error: "Failed to fetch questions" });
+      log(`Error generating questions: ${error}`);
+      res.status(500).json({ error: "Failed to generate questions" });
     }
   });
 

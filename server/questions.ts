@@ -48,9 +48,6 @@ function generateMathQuestion(grade: number): Question {
   }
 
   return {
-    id: Math.floor(Math.random() * 1000000), // Random ID for now
-    subject: "math",
-    grade,
     question,
     answer,
     explanation
@@ -78,9 +75,6 @@ function generateEnglishQuestion(grade: number): Question {
   const selectedQuestion = questions[Math.floor(Math.random() * questions.length)];
 
   return {
-    id: Math.floor(Math.random() * 1000000),
-    subject: "english",
-    grade,
     question: selectedQuestion.question,
     answer: selectedQuestion.answer,
     explanation: selectedQuestion.explanation

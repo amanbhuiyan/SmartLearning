@@ -1,8 +1,8 @@
-import { User, StudentSubject, Question, InsertUser } from "@shared/schema";
+import { User, StudentSubject, InsertUser } from "@shared/schema";
 import session from "express-session";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
-import { users, studentSubjects, questions } from "@shared/schema";
+import { users, studentSubjects } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import { log } from "./vite";
 
@@ -16,7 +16,6 @@ export interface IStorage {
   updateUserStripeInfo(userId: number, info: { customerId: string, subscriptionId: string }): Promise<User>;
   getUserSubjects(userId: number): Promise<StudentSubject[]>;
   createUserSubjects(userId: number, subjects: string[], grade: number): Promise<StudentSubject[]>;
-  getDailyQuestions(subject: string, grade: number): Promise<Question[]>;
   sessionStore: session.Store;
   getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
   updateSubscriptionStatus(userId: number, isSubscribed: boolean): Promise<User>;
@@ -117,24 +116,6 @@ export class DatabaseStorage implements IStorage {
       return result;
     } catch (error) {
       log(`Error creating user subjects: ${error instanceof Error ? error.message : String(error)}`);
-      throw error;
-    }
-  }
-
-  async getDailyQuestions(subject: string, grade: number): Promise<Question[]> {
-    try {
-      log(`Getting questions for subject: ${subject}, grade: ${grade}`);
-      const results = await db
-        .select()
-        .from(questions)
-        .where(eq(questions.subject, subject))
-        .where(eq(questions.grade, grade))
-        .limit(20);
-
-      log(`Found ${results.length} questions for ${subject} grade ${grade}`);
-      return results;
-    } catch (error) {
-      log(`Error getting daily questions: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
