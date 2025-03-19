@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraduationCap, BookOpen, Users, Star, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 const registerFormSchema = insertUserSchema.extend({
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -30,11 +31,23 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
 
+  // Check if user has a profile
+  const { data: profile } = useQuery({
+    queryKey: ["/api/profile"],
+    enabled: !!user, // Only run query if user exists
+  });
+
   useEffect(() => {
     if (user) {
-      setLocation("/");
+      // If user has no profile, redirect to setup
+      if (!profile) {
+        setLocation("/setup-profile");
+        return;
+      }
+      // If user has profile, go to dashboard
+      setLocation("/dashboard");
     }
-  }, [user, setLocation]);
+  }, [user, profile, setLocation]);
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),

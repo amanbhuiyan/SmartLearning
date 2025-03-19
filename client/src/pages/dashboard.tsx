@@ -26,6 +26,7 @@ export default function Dashboard() {
 
   const { data: questionsBySubject, isLoading: isLoadingQuestions } = useQuery<Record<string, Question[]>>({
     queryKey: ["/api/questions"],
+    enabled: !!profile, // Only fetch questions if profile exists
   });
 
   const handleLogout = async () => {
@@ -37,7 +38,7 @@ export default function Dashboard() {
     navigate("/subscribe");
   };
 
-  if (isLoadingProfile || isLoadingQuestions) {
+  if (isLoadingProfile) {
     return (
       <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -45,18 +46,17 @@ export default function Dashboard() {
     );
   }
 
-  if (!profile || !questionsBySubject) {
+  // Redirect to profile setup if no profile exists
+  if (!profile) {
+    navigate("/setup-profile");
+    return null;
+  }
+
+  // Show loading state while fetching questions
+  if (isLoadingQuestions) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
-        <div className="max-w-4xl mx-auto">
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-center text-gray-600">
-                No profile found. Please set up your learning profile first.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
