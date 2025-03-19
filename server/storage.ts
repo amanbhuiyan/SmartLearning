@@ -86,10 +86,12 @@ export class DatabaseStorage implements IStorage {
 
   async getUserSubjects(userId: number): Promise<StudentSubject[]> {
     try {
+      log(`Getting subjects for user: ${userId}`);
       const results = await db
         .select()
         .from(studentSubjects)
         .where(eq(studentSubjects.user_id, userId));
+      log(`Found ${results.length} subjects for user`);
       return results;
     } catch (error) {
       log(`Error getting user subjects: ${error instanceof Error ? error.message : String(error)}`);
@@ -99,6 +101,7 @@ export class DatabaseStorage implements IStorage {
 
   async createUserSubjects(userId: number, subjects: string[], grade: number): Promise<StudentSubject[]> {
     try {
+      log(`Creating subjects for user ${userId}: ${subjects.join(', ')}`);
       const subjectEntries = subjects.map(subject => ({
         user_id: userId,
         subject,
@@ -110,6 +113,7 @@ export class DatabaseStorage implements IStorage {
         .insert(studentSubjects)
         .values(subjectEntries)
         .returning();
+      log(`Created ${result.length} subjects for user`);
       return result;
     } catch (error) {
       log(`Error creating user subjects: ${error instanceof Error ? error.message : String(error)}`);
@@ -127,7 +131,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(questions.grade, grade))
         .limit(20);
 
-      log(`Found ${results.length} questions`);
+      log(`Found ${results.length} questions for ${subject} grade ${grade}`);
       return results;
     } catch (error) {
       log(`Error getting daily questions: ${error instanceof Error ? error.message : String(error)}`);
