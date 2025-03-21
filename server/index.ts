@@ -62,15 +62,19 @@ function isTimeToSendEmail(preferredTime: string): boolean {
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
   
-  // Log time details for debugging only when close to matching
-  if (Math.abs(currentHour - hour) <= 1) {
-    log(`Time check - User: ${preferredTime}, System: ${currentHour}:${currentMinute}`);
-    log(`Comparing ${currentHour}:${currentMinute} with ${hour}:${parseInt(minutes)}`);
+  // Log time details for debugging - now showing all checks for transparency
+  log(`Email time check - User preferred: ${preferredTime} (${hour}:${parseInt(minutes)}), Current time: ${currentHour}:${currentMinute}`);
+  
+  // Check if the times match
+  const isMatch = currentHour === hour && currentMinute === parseInt(minutes);
+  
+  if (isMatch) {
+    log(`MATCH FOUND! Will send email now for preferred time: ${preferredTime}`);
   }
   
   // Return true if the current time is exactly the preferred time
   // This ensures emails are sent precisely at the user's chosen time
-  return currentHour === hour && currentMinute === parseInt(minutes);
+  return isMatch;
 }
 
 // Function to send daily questions to users
@@ -126,14 +130,20 @@ async function sendDailyQuestionsToAllUsers() {
 
         // Update the last question date for all subjects
         const currentTimestamp = new Date().toISOString();
-        for (const subject of userSubjects) {
+        
+        log(`Updating lastQuestionDate to ${currentTimestamp} for user ${user.user_id}`);
+        
+        // Update all subjects for this user in a single query
+        try {
           await db
             .update(studentSubjects)
             .set({ lastQuestionDate: currentTimestamp })
-            .where(
-              eq(studentSubjects.user_id, user.user_id)
-            )
+            .where(eq(studentSubjects.user_id, user.user_id))
             .execute();
+          
+          log(`Successfully updated lastQuestionDate for user ${user.user_id}`);
+        } catch (error) {
+          log(`Error updating lastQuestionDate: ${error}`);
         }
 
         log(`Successfully sent daily questions to user ${user.email} and updated timestamp`);
@@ -177,6 +187,15 @@ async function sendDailyQuestionsToAllUsers() {
 
       // Start the email scheduler after server is running
       log("Starting email scheduler...");
+      
+      // Run immediately once to check for any pending emails
+      log("Running initial email check...");
+      sendDailyQuestionsToAllUsers().then(() => {
+        log("Initial email check completed");
+      }).catch(error => {
+        log(`Error in initial email check: ${error}`);
+      });
+      
       // Check every 5 minutes for emails that need to be sent
       // This is sufficient because we check the exact time within the function
       setInterval(sendDailyQuestionsToAllUsers, 5 * 60 * 1000);
