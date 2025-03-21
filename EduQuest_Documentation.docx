@@ -1,0 +1,128 @@
+# EduQuest - Educational Platform Documentation
+
+## 1. Application Overview
+EduQuest is an advanced educational platform designed to provide personalized learning experiences for children. The platform combines intelligent question generation, secure user management, and automated communication systems to create an engaging learning environment.
+
+## 2. Core Features
+
+### 2.1 User Authentication & Management
+- Secure user registration and login system
+- Password encryption using scrypt
+- Session management with PostgreSQL session store
+- User profile management with personal information
+
+### 2.2 Student Profile Management
+- Child profile creation with name customization
+- Multiple subject selection (Math, English)
+- Grade level specification
+- Support for multiple children per user account
+
+### 2.3 Intelligent Question Generation
+- Dynamic question generation based on subject and grade
+- Automated difficulty adjustment
+- Subjects supported:
+  * Mathematics (Addition, Subtraction, Multiplication)
+  * English (Grammar, Vocabulary)
+- Detailed explanations for each question
+
+### 2.4 Automated Communication System
+- Daily question delivery via email
+- Personalized email templates
+- Custom formatting for each subject
+- 5-minute interval scheduling for updates
+
+### 2.5 Subscription Management
+- Stripe integration for payment processing
+- Trial period management
+- Subscription status tracking
+- Customer portal integration
+
+## 3. Technical Architecture
+
+### 3.1 Frontend Stack
+- Framework: React with TypeScript
+- State Management: TanStack Query (React Query)
+- Routing: Wouter
+- UI Components: 
+  * Shadcn/ui
+  * Radix UI primitives
+  * Tailwind CSS for styling
+- Form Management: React Hook Form with Zod validation
+
+### 3.2 Backend Stack
+- Runtime: Node.js
+- Framework: Express.js
+- Database: PostgreSQL
+- ORM: Drizzle
+- Email Service: Resend API
+- Authentication: Passport.js
+- Session Management: express-session with PostgreSQL store
+
+### 3.3 Database Schema
+- Users Table:
+  * user_id (Primary Key)
+  * email
+  * password (encrypted)
+  * first_name
+  * last_name
+  * stripe_customer_id
+  * stripe_subscription_id
+  * is_subscribed
+  * trial_ends_at
+
+- Student Subjects Table:
+  * student_subject_id (Primary Key)
+  * user_id (Foreign Key)
+  * child_name
+  * subject
+  * grade
+  * last_question_date
+
+### 3.4 API Endpoints
+- Authentication:
+  * POST /api/register
+  * POST /api/login
+  * POST /api/logout
+  * GET /api/user
+
+- Profile Management:
+  * POST /api/subjects
+  * GET /api/subjects
+  * PATCH /api/profile
+
+- Subscription:
+  * POST /api/create-subscription
+  * POST /api/cancel-subscription
+  * GET /api/subscription-status
+
+### 3.5 Security Features
+- Password hashing with salt
+- CSRF protection
+- Session management
+- Input validation with Zod
+- Secure headers
+- Rate limiting
+
+### 3.6 Development & Deployment
+- Development Environment: Replit
+- Build Tool: Vite
+- Package Manager: npm
+- Type Checking: TypeScript
+- Code Formatting: Prettier
+- Deployment: Replit Deployments
+
+## 4. Third-Party Integrations
+- Stripe for payment processing
+- Resend for email delivery
+- PostgreSQL (Neon) for database
+
+## 5. Future Expansion Possibilities
+- Additional subjects
+- Progress tracking
+- Parent dashboard
+- Real-time tutoring
+- Mobile application
+- Learning analytics
+- Content management system
+
+This documentation provides a comprehensive overview of the EduQuest platform's current implementation. The modular architecture allows for easy adaptation to different technology stacks while maintaining the same core functionality.
