@@ -4,7 +4,9 @@ import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
 import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
-import { runMigrations } from "./db";
+import { runMigrations, db } from "./db";
+import { eq } from "drizzle-orm";
+import { studentSubjects } from "../shared/schema";
 
 const app = express();
 app.use(express.json());
@@ -56,9 +58,19 @@ function isTimeToSendEmail(preferredTime: string): boolean {
   const preferredDateTime = new Date();
   preferredDateTime.setHours(hour, parseInt(minutes), 0, 0);
 
+  // For precise scheduling, compare current time with user's preferred time
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  
+  // Log time details for debugging only when close to matching
+  if (Math.abs(currentHour - hour) <= 1) {
+    log(`Time check - User: ${preferredTime}, System: ${currentHour}:${currentMinute}`);
+    log(`Comparing ${currentHour}:${currentMinute} with ${hour}:${parseInt(minutes)}`);
+  }
+  
   // Return true if the current time is exactly the preferred time
   // This ensures emails are sent precisely at the user's chosen time
-  return now.getHours() === hour && now.getMinutes() === parseInt(minutes);
+  return currentHour === hour && currentMinute === parseInt(minutes);
 }
 
 // Function to send daily questions to users
@@ -80,7 +92,16 @@ async function sendDailyQuestionsToAllUsers() {
           continue;
         }
 
-        // Check if it's time to send email for this user
+        // Check if an email was already sent today
+        const lastQuestionDate = userSubjects[0].lastQuestionDate;
+        const todayDateStr = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+        
+        if (lastQuestionDate && lastQuestionDate.startsWith(todayDateStr)) {
+          log(`Already sent email to ${user.email} today, skipping...`);
+          continue;
+        }
+        
+        // Check if it's time to send email for this user based on their preferred time
         if (!isTimeToSendEmail(userSubjects[0].preferredEmailTime)) {
           continue;
         }
@@ -103,7 +124,19 @@ async function sendDailyQuestionsToAllUsers() {
           questionsBySubject
         );
 
-        log(`Successfully sent daily questions to user ${user.email}`);
+        // Update the last question date for all subjects
+        const currentTimestamp = new Date().toISOString();
+        for (const subject of userSubjects) {
+          await db
+            .update(studentSubjects)
+            .set({ lastQuestionDate: currentTimestamp })
+            .where(
+              eq(studentSubjects.user_id, user.user_id)
+            )
+            .execute();
+        }
+
+        log(`Successfully sent daily questions to user ${user.email} and updated timestamp`);
       } catch (error) {
         log(`Failed to send questions to user ${user.email}: ${error}`);
         continue;
@@ -150,7 +183,7 @@ async function sendDailyQuestionsToAllUsers() {
       log("Email scheduler started successfully");
     });
   } catch (error) {
-    log("Failed to start server:", error);
+    log(`Failed to start server: ${error}`);
     process.exit(1);
   }
 })();

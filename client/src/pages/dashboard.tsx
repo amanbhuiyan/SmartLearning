@@ -179,6 +179,14 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                <div>
+                  <span className="text-sm font-medium text-gray-500">Daily Questions Delivery:</span>
+                  <span className="ml-2 text-sm font-medium text-gray-900">{profile.preferredEmailTime}</span>
+                </div>
+              </div>
+            </div>
             {profile.subjects.map(subject => {
               const questions = questionsBySubject[subject] || [];
               return (
