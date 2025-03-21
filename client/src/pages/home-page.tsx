@@ -85,6 +85,8 @@ export default function HomePage() {
     } else if (!user.isSubscribed && !user.trialEndsAt) {
       setLocation("/subscribe");
     }
+    // Don't redirect to dashboard if profile is null or undefined
+    // This way we show the profile setup form
   }, [profile, user, setLocation]);
 
   if (isLoadingProfile) {

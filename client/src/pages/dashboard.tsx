@@ -14,6 +14,7 @@ import { Loader2, LogOut, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
+import { useEffect } from "react";
 
 interface StudentProfile {
   userId: number;
@@ -62,11 +63,13 @@ export default function Dashboard() {
     return null;
   }
 
-  // If no profile exists, redirect to profile setup
-  if (!isLoadingProfile && !profile) {
-    navigate("/");
-    return null;
-  }
+  // If no profile exists, use useEffect to redirect to profile setup
+  // This prevents the "Cannot update during rendering" React error
+  useEffect(() => {
+    if (!isLoadingProfile && !profile) {
+      navigate("/");
+    }
+  }, [isLoadingProfile, profile, navigate]);
 
   if (isLoadingProfile || isLoadingQuestions) {
     return (
