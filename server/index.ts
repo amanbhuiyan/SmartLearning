@@ -4,7 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
 import { getDailyQuestions } from "./questions";
 import { sendDailyQuestions } from "./email";
-// import { runMigrations } from "./db";
+import { runMigrations } from "./db";
 
 const app = express();
 app.use(express.json());
@@ -119,7 +119,7 @@ async function sendDailyQuestionsToAllUsers() {
   try {
     log("Starting server initialization...");
 
-    // Temporarily comment out migrations
+    // Migrations have been run manually
     // await runMigrations();
 
     const server = await registerRoutes(app);
