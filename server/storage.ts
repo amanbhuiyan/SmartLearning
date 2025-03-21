@@ -111,7 +111,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createUserSubjects(userId: number, childName: string, subjects: string[], grade: number): Promise<StudentSubject[]> {
+  async createUserSubjects(userId: number, childName: string, subjects: string[], grade: number, preferredEmailTime: string = "09:00 AM"): Promise<StudentSubject[]> {
     try {
       log(`Creating subjects for user ${userId}: ${subjects.join(', ')}`);
       const subjectEntries = subjects.map(subject => ({
@@ -120,6 +120,7 @@ export class DatabaseStorage implements IStorage {
         subject,
         grade,
         lastQuestionDate: new Date().toISOString(),
+        preferredEmailTime: preferredEmailTime // Use the provided time parameter
       }));
 
       const result = await db

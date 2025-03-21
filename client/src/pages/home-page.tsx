@@ -74,19 +74,31 @@ export default function HomePage() {
     }
   };
 
+  // Simplified navigation logic
   useEffect(() => {
+    // Redirect to login page if not logged in
     if (!user) {
+      console.log("Not logged in, redirecting to auth page");
       setLocation("/auth");
       return;
     }
 
+    // If user has a profile, go to dashboard
     if (profile) {
+      console.log("User has profile, redirecting to dashboard");
       setLocation("/dashboard");
-    } else if (!user.isSubscribed && !user.trialEndsAt) {
-      setLocation("/subscribe");
+      return;
     }
-    // Don't redirect to dashboard if profile is null or undefined
-    // This way we show the profile setup form
+    
+    // If user has no subscription or trial, go to subscribe page
+    if (!user.isSubscribed && !user.trialEndsAt) {
+      console.log("User has no subscription, redirecting to subscribe page");
+      setLocation("/subscribe");
+      return;
+    }
+
+    // Otherwise, stay on this page to show the profile setup form
+    console.log("Showing profile setup form");
   }, [profile, user, setLocation]);
 
   if (isLoadingProfile) {

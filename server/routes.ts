@@ -17,12 +17,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = insertProfileSchema.parse(req.body);
 
-      // Create a subject entry for each selected subject
+      // Create a subject entry for each selected subject with preferred email time
       const subjects = await storage.createUserSubjects(
         req.user.user_id,
         data.childName,
         data.subjects,
-        data.grade
+        data.grade,
+        data.preferredEmailTime  // Pass the preferred email time from the form
       );
 
       res.json(subjects);
@@ -49,7 +50,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         childName: subjects[0].childName,
         subjects: subjects.map(s => s.subject),
         grade: subjects[0].grade,
-        lastQuestionDate: subjects[0].lastQuestionDate
+        lastQuestionDate: subjects[0].lastQuestionDate,
+        preferredEmailTime: subjects[0].preferredEmailTime // Include the preferred email time
       };
 
       res.json(profile);

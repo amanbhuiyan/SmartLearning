@@ -63,13 +63,13 @@ export default function Dashboard() {
     return null;
   }
 
-  // If no profile exists, use useEffect to redirect to profile setup
-  // This prevents the "Cannot update during rendering" React error
+  // This redirects to homepage for profile creation if needed
   useEffect(() => {
-    if (!isLoadingProfile && !profile) {
+    if (!isLoadingProfile && !profile && user) {
+      console.log("Redirecting to homepage for profile setup");
       navigate("/");
     }
-  }, [isLoadingProfile, profile, navigate]);
+  }, [isLoadingProfile, profile, navigate, user]);
 
   if (isLoadingProfile || isLoadingQuestions) {
     return (
