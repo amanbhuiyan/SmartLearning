@@ -15,7 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription, // Added this import
+  FormDescription,
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -25,17 +25,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { apiRequest } from "@/lib/queryClient";
 import type { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 const subjects = [
   { id: "math", label: "Mathematics" },
   { id: "english", label: "English" },
 ] as const;
+
+const timeOptions = Array.from({ length: 12 }, (_, i) => {
+  const hour = (i + 1).toString().padStart(2, '0');
+  return [
+    `${hour}:00 AM`,
+    `${hour}:30 AM`,
+    `${hour}:00 PM`,
+    `${hour}:30 PM`,
+  ];
+}).flat();
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -44,7 +61,7 @@ export default function HomePage() {
 
   const { data: profile, isLoading: isLoadingProfile } = useQuery({
     queryKey: ["/api/profile"],
-    enabled: !!user, // Only fetch profile if user exists
+    enabled: !!user,
   });
 
   const form = useForm<z.infer<typeof insertProfileSchema>>({
@@ -53,14 +70,13 @@ export default function HomePage() {
       childName: "",
       subjects: [],
       grade: undefined,
-      preferredEmailTime: "09:00 AM", // Set default time
+      preferredEmailTime: "09:00 AM",
     },
   });
 
   const onSubmit = async (data: z.infer<typeof insertProfileSchema>) => {
     try {
       await apiRequest("POST", "/api/profile", data);
-      // Invalidate the profile query to trigger a refetch
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       setLocation("/dashboard");
     } catch (error: any) {
@@ -78,7 +94,6 @@ export default function HomePage() {
       return;
     }
 
-    // Only redirect to dashboard if profile exists and user has subscription access
     if (profile) {
       setLocation("/dashboard");
     } else if (!user.isSubscribed && !user.trialEndsAt) {
@@ -94,7 +109,6 @@ export default function HomePage() {
     );
   }
 
-  // If there's no profile, show the profile setup form
   if (!profile) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
@@ -155,36 +169,45 @@ export default function HomePage() {
                     control={form.control}
                     name="preferredEmailTime"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col">
                         <FormLabel>Preferred Daily Email Time</FormLabel>
-                        <div className="relative">
-                          <FormControl>
-                            <div className="flex items-center">
-                              <Input
-                                type="time"
-                                className="pr-20"
-                                {...field}
-                                onChange={(e) => {
-                                  const time = e.target.value;
-                                  if (time) {
-                                    // Convert 24h time to 12h format with AM/PM
-                                    const [hours, minutes] = time.split(':');
-                                    const date = new Date();
-                                    date.setHours(parseInt(hours));
-                                    date.setMinutes(parseInt(minutes));
-                                    const formattedTime = date.toLocaleTimeString('en-US', {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      hour12: true
-                                    }).replace(/\s+/g, ' ');
-                                    field.onChange(formattedTime);
-                                  }
-                                }}
-                              />
-                              <Clock className="absolute right-3 h-4 w-4 text-gray-400" />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  field.value
+                                ) : (
+                                  <span>Pick a time</span>
+                                )}
+                                <Clock className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0" align="start">
+                            <div className="grid grid-cols-1 gap-1 p-2 max-h-[300px] overflow-y-auto">
+                              {timeOptions.map((time) => (
+                                <Button
+                                  key={time}
+                                  onClick={() => {
+                                    field.onChange(time);
+                                    form.setValue("preferredEmailTime", time);
+                                  }}
+                                  variant={field.value === time ? "default" : "ghost"}
+                                  className="justify-start font-normal"
+                                >
+                                  {time}
+                                </Button>
+                              ))}
                             </div>
-                          </FormControl>
-                        </div>
+                          </PopoverContent>
+                        </Popover>
                         <FormDescription>
                           Choose when you'd like to receive daily practice questions
                         </FormDescription>
@@ -251,5 +274,5 @@ export default function HomePage() {
     );
   }
 
-  return null; // This should never be reached due to the useEffect redirect
+  return null;
 }
