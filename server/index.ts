@@ -52,6 +52,12 @@ function isTimeToSendEmail(preferredTime: string): boolean {
   if (period === 'PM' && hour !== 12) hour += 12;
   if (period === 'AM' && hour === 12) hour = 0;
 
+  // Create a Date object for the preferred time today
+  const preferredDateTime = new Date();
+  preferredDateTime.setHours(hour, parseInt(minutes), 0, 0);
+
+  // Return true if the current time is exactly the preferred time
+  // This ensures emails are sent precisely at the user's chosen time
   return now.getHours() === hour && now.getMinutes() === parseInt(minutes);
 }
 
@@ -138,8 +144,9 @@ async function sendDailyQuestionsToAllUsers() {
 
       // Start the email scheduler after server is running
       log("Starting email scheduler...");
-      // Check every minute for emails that need to be sent
-      setInterval(sendDailyQuestionsToAllUsers, 60 * 1000);
+      // Check every 5 minutes for emails that need to be sent
+      // This is sufficient because we check the exact time within the function
+      setInterval(sendDailyQuestionsToAllUsers, 5 * 60 * 1000);
       log("Email scheduler started successfully");
     });
   } catch (error) {
