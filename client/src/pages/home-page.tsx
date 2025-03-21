@@ -45,9 +45,11 @@ export default function HomePage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: profile, isLoading: isLoadingProfile } = useQuery({
+  const { data: profile, isLoading: isLoadingProfile, error: profileError } = useQuery({
     queryKey: ["/api/profile"],
     enabled: !!user,
+    retry: false, // Don't retry on error (like 404)
+    retryOnMount: false // Don't retry when component remounts
   });
 
   const form = useForm<z.infer<typeof insertProfileSchema>>({
@@ -74,8 +76,13 @@ export default function HomePage() {
     }
   };
 
-  // Simplified navigation logic
+  // Navigation logic with protection against excessive redirects
   useEffect(() => {
+    // Skip effect if still loading
+    if (isLoadingProfile) {
+      return;
+    }
+
     // Redirect to login page if not logged in
     if (!user) {
       console.log("Not logged in, redirecting to auth page");
@@ -90,16 +97,21 @@ export default function HomePage() {
       return;
     }
     
-    // If user has no subscription or trial, go to subscribe page
-    if (!user.isSubscribed && !user.trialEndsAt) {
-      console.log("User has no subscription, redirecting to subscribe page");
-      setLocation("/subscribe");
+    // If profileError is a 404, it means user has no profile yet, so we show the form
+    // This prevents the redirect loop because we're explicitly handling the "no profile" case
+    if (profileError && !profile) {
+      // If user has no subscription or trial, go to subscribe page
+      if (!user.isSubscribed && !user.trialEndsAt) {
+        console.log("User has no subscription, redirecting to subscribe page");
+        setLocation("/subscribe");
+        return;
+      }
+
+      // Otherwise, stay on this page to show the profile setup form
+      console.log("Showing profile setup form");
       return;
     }
-
-    // Otherwise, stay on this page to show the profile setup form
-    console.log("Showing profile setup form");
-  }, [profile, user, setLocation]);
+  }, [profile, profileError, isLoadingProfile, user, setLocation]);
 
   if (isLoadingProfile) {
     return (
