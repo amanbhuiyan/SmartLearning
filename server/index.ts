@@ -41,14 +41,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// Function to send daily questions to all users
+// Function to check if it's time to send email for a user
+function isTimeToSendEmail(preferredTime: string): boolean {
+  const now = new Date();
+  const [time, period] = preferredTime.split(' ');
+  const [hours, minutes] = time.split(':');
+
+  // Convert to 24-hour format for comparison
+  let hour = parseInt(hours);
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+
+  return now.getHours() === hour && now.getMinutes() === parseInt(minutes);
+}
+
+// Function to send daily questions to users
 async function sendDailyQuestionsToAllUsers() {
   try {
-    log("Starting scheduled email sending to all users...");
+    log("Starting scheduled email check...");
 
     // Get all users from the database
     const allUsers = await storage.getAllUsers();
-    log(`Found ${allUsers.length} users to send emails to`);
+    log(`Found ${allUsers.length} users to check`);
 
     for (const user of allUsers) {
       try {
@@ -57,6 +71,11 @@ async function sendDailyQuestionsToAllUsers() {
 
         if (!userSubjects.length) {
           log(`No subjects found for user ${user.user_id}, skipping...`);
+          continue;
+        }
+
+        // Check if it's time to send email for this user
+        if (!isTimeToSendEmail(userSubjects[0].preferredEmailTime)) {
           continue;
         }
 
@@ -71,21 +90,20 @@ async function sendDailyQuestionsToAllUsers() {
           questionsBySubject[subjectRecord.subject] = questions;
         }
 
-        // Send email to the user with child's name
+        // Send email to the user
         await sendDailyQuestions(
           user.email,
-          userSubjects[0].childName, // Using child's name instead of user's first name
+          userSubjects[0].childName,
           questionsBySubject
         );
 
         log(`Successfully sent daily questions to user ${user.email}`);
       } catch (error) {
         log(`Failed to send questions to user ${user.email}: ${error}`);
-        // Continue with next user even if one fails
         continue;
       }
     }
-    log("Completed scheduled email sending to all users");
+    log("Completed scheduled email check");
   } catch (error) {
     log(`Error in scheduled email sending: ${error}`);
   }
@@ -120,10 +138,8 @@ async function sendDailyQuestionsToAllUsers() {
 
       // Start the email scheduler after server is running
       log("Starting email scheduler...");
-      // Run immediately once
-      sendDailyQuestionsToAllUsers();
-      // Then schedule to run every 5 minutes
-      setInterval(sendDailyQuestionsToAllUsers, 5 * 60 * 1000);
+      // Check every minute for emails that need to be sent
+      setInterval(sendDailyQuestionsToAllUsers, 60 * 1000);
       log("Email scheduler started successfully");
     });
   } catch (error) {

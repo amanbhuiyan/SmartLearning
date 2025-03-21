@@ -24,6 +24,7 @@ export const studentSubjects = pgTable("student_subjects", {
   subject: text("subject").notNull(),
   grade: integer("grade").notNull(),
   lastQuestionDate: date("last_question_date"),
+  preferredEmailTime: text("preferred_email_time").notNull().default("09:00 AM"),
 });
 
 // Schema for registration
@@ -45,6 +46,7 @@ export const insertProfileSchema = z.object({
   childName: z.string().min(1, "Child's name is required"),
   subjects: z.array(z.enum(['math', 'english'])).min(1, "Please select at least one subject"),
   grade: z.number().min(1).max(10),
+  preferredEmailTime: z.string().regex(/^(0[1-9]|1[0-2]):[0-5][0-9] (AM|PM)$/, "Invalid time format. Use HH:MM AM/PM"),
 });
 
 // Question type definition (for runtime use only, not stored in DB)

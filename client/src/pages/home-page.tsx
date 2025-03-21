@@ -28,6 +28,8 @@ import { apiRequest } from "@/lib/queryClient";
 import type { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Clock } from "lucide-react"; // Add this import
 
 const subjects = [
   { id: "math", label: "Mathematics" },
@@ -50,6 +52,7 @@ export default function HomePage() {
       childName: "",
       subjects: [],
       grade: undefined,
+      preferredEmailTime: '', //add default value
     },
   });
 
@@ -99,7 +102,7 @@ export default function HomePage() {
             <CardHeader>
               <CardTitle>Setup Your Child's Learning Profile</CardTitle>
               <CardDescription>
-                Choose your child's grade and preferred subjects for daily questions
+                Choose your child's grade, preferred subjects, and daily email time
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -142,6 +145,48 @@ export default function HomePage() {
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="preferredEmailTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Preferred Daily Email Time</FormLabel>
+                        <div className="relative">
+                          <FormControl>
+                            <div className="flex items-center">
+                              <Input
+                                type="time"
+                                className="pr-20"
+                                {...field}
+                                onChange={(e) => {
+                                  const time = e.target.value;
+                                  if (time) {
+                                    // Convert 24h time to 12h format with AM/PM
+                                    const [hours, minutes] = time.split(':');
+                                    const date = new Date();
+                                    date.setHours(parseInt(hours));
+                                    date.setMinutes(parseInt(minutes));
+                                    const formattedTime = date.toLocaleTimeString('en-US', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      hour12: true
+                                    }).replace(/\s+/g, ' ');
+                                    field.onChange(formattedTime);
+                                  }
+                                }}
+                              />
+                              <Clock className="absolute right-3 h-4 w-4 text-gray-400" />
+                            </div>
+                          </FormControl>
+                        </div>
+                        <FormDescription>
+                          Choose when you'd like to receive daily practice questions
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
