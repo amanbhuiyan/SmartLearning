@@ -15,6 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription, // Added this import
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -29,7 +30,7 @@ import type { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Clock } from "lucide-react"; // Add this import
+import { Clock } from "lucide-react";
 
 const subjects = [
   { id: "math", label: "Mathematics" },
@@ -52,7 +53,7 @@ export default function HomePage() {
       childName: "",
       subjects: [],
       grade: undefined,
-      preferredEmailTime: '', //add default value
+      preferredEmailTime: "09:00 AM", // Set default time
     },
   });
 
