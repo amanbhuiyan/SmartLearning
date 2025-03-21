@@ -18,7 +18,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraduationCap, BookOpen, Users, Star, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
+import { GraduationCap, Sparkles, BookOpen, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -26,25 +27,44 @@ const registerFormSchema = insertUserSchema.extend({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
+const fadeIn = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5 }
+};
+
+const FeatureCard = ({ icon: Icon, title, description }: { icon: any, title: string, description: string }) => (
+  <motion.div
+    className="flex items-start gap-4 p-4 rounded-xl bg-white/50 backdrop-blur-sm border border-primary/10 hover:border-primary/20 transition-all"
+    whileHover={{ scale: 1.02 }}
+    {...fadeIn}
+  >
+    <div className="bg-primary/10 p-3 rounded-lg">
+      <Icon className="h-6 w-6 text-primary" />
+    </div>
+    <div>
+      <h3 className="font-semibold text-lg text-gray-900">{title}</h3>
+      <p className="text-gray-600">{description}</p>
+    </div>
+  </motion.div>
+);
+
 export default function AuthPage() {
   const [, setLocation] = useLocation();
   const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
 
-  // Check if user has a profile
   const { data: profile } = useQuery({
     queryKey: ["/api/profile"],
-    enabled: !!user, // Only run query if user exists
+    enabled: !!user,
   });
 
   useEffect(() => {
     if (user) {
-      // If user has no profile, redirect to home for setup
       if (!profile) {
         setLocation("/");
         return;
       }
-      // If user has profile, go to dashboard
       setLocation("/dashboard");
     }
   }, [user, profile, setLocation]);
@@ -84,15 +104,29 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 to-primary/10 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-8 items-center">
           {/* Left side - Branding and Features */}
-          <div className="space-y-8">
-            <div className="space-y-4">
+          <motion.div 
+            className="space-y-8"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            <motion.div 
+              className="space-y-4"
+              {...fadeIn}
+            >
               <div className="flex items-center gap-3">
-                <GraduationCap className="h-12 w-12 text-primary" />
-                <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-indigo-600 text-transparent bg-clip-text">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring" }}
+                >
+                  <GraduationCap className="h-12 w-12 text-primary" />
+                </motion.div>
+                <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 text-transparent bg-clip-text">
                   EduQuest
                 </h1>
               </div>
@@ -103,7 +137,7 @@ export default function AuthPage() {
                 Personalized learning experiences that make education fun and engaging.
                 Start with a free week trial, then just £2/week.
               </p>
-            </div>
+            </motion.div>
 
             {/* Hero Illustration */}
             <div className="hidden lg:block">
@@ -111,52 +145,41 @@ export default function AuthPage() {
             </div>
 
             {/* Feature List */}
-            <div className="grid gap-6">
-              <div className="flex items-start gap-4">
-                <div className="bg-primary/10 p-3 rounded-lg">
-                  <BookOpen className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-gray-900">Daily Learning Materials</h3>
-                  <p className="text-gray-600">Fresh questions every day in Math and English</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="bg-primary/10 p-3 rounded-lg">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-gray-900">Personalized Experience</h3>
-                  <p className="text-gray-600">Content tailored to your child's grade level</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="bg-primary/10 p-3 rounded-lg">
-                  <Star className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-gray-900">Expert Guidance</h3>
-                  <p className="text-gray-600">Detailed explanations and step-by-step solutions</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="bg-primary/10 p-3 rounded-lg">
-                  <Sparkles className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-gray-900">Engaging Content</h3>
-                  <p className="text-gray-600">Interactive questions that make learning fun</p>
-                </div>
-              </div>
-            </div>
-          </div>
+            <motion.div 
+              className="grid gap-4"
+              variants={{
+                initial: { opacity: 0 },
+                animate: { opacity: 1, transition: { staggerChildren: 0.1 } }
+              }}
+              initial="initial"
+              animate="animate"
+            >
+              <FeatureCard
+                icon={BookOpen}
+                title="Daily Learning Materials"
+                description="Fresh questions every day in Math and English"
+              />
+              <FeatureCard
+                icon={Users}
+                title="Personalized Experience"
+                description="Content tailored to your child's grade level"
+              />
+              <FeatureCard
+                icon={Sparkles}
+                title="Engaging Content"
+                description="Interactive questions that make learning fun"
+              />
+            </motion.div>
+          </motion.div>
 
           {/* Right side - Auth Form */}
-          <div className="lg:p-8">
-            <Card className="w-full backdrop-blur-sm bg-white/80">
+          <motion.div 
+            className="lg:p-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.8 }}
+          >
+            <Card className="w-full backdrop-blur-sm bg-white/90">
               <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl font-bold text-center">Welcome to EduQuest</CardTitle>
               </CardHeader>
@@ -181,7 +204,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Email</FormLabel>
                               <FormControl>
-                                <Input type="email" {...field} />
+                                <Input type="email" {...field} className="bg-white/50" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -194,7 +217,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Password</FormLabel>
                               <FormControl>
-                                <Input type="password" {...field} />
+                                <Input type="password" {...field} className="bg-white/50" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -225,7 +248,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>First Name</FormLabel>
                               <FormControl>
-                                <Input {...field} />
+                                <Input {...field} className="bg-white/50" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -238,7 +261,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Last Name</FormLabel>
                               <FormControl>
-                                <Input {...field} />
+                                <Input {...field} className="bg-white/50" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -251,7 +274,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Email</FormLabel>
                               <FormControl>
-                                <Input type="email" {...field} />
+                                <Input type="email" {...field} className="bg-white/50" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -264,7 +287,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Password</FormLabel>
                               <FormControl>
-                                <Input type="password" {...field} />
+                                <Input type="password" {...field} className="bg-white/50" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -283,7 +306,7 @@ export default function AuthPage() {
                 </Tabs>
               </CardContent>
             </Card>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
