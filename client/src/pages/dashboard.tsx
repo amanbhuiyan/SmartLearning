@@ -22,6 +22,7 @@ interface StudentProfile {
   subjects: string[];
   grade: number;
   lastQuestionDate: string | null;
+  preferredEmailTime: string;
 }
 
 export default function Dashboard() {
